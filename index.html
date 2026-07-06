@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wonderkid — A Football Life | Free Career Sim Game</title>
+<meta name="description" content="Live a whole football career, one decision at a time. Rise from the academy to the Ballon d'Or — or flame out trying. Free browser game, no download.">
+<meta property="og:title" content="Wonderkid — A Football Life">
+<meta property="og:description" content="A football career sim where every decision counts. Play free in your browser.">
+<meta property="og:type" content="website">
+
+<!-- ============ GOOGLE ADSENSE ============
+Once your AdSense application is approved, paste your snippet here.
+It looks like this (replace ca-pub-XXXX with your publisher ID):
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX" crossorigin="anonymous"></script>
+========================================= -->
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;600;700;800&display=swap');
+  :root{
+    --bg:#f6eedd; --card:#fffcf2; --ink:#171310; --muted:#7c7060;
+    --green:#2f9e44; --gold:#f5c211; --red:#e8452c; --blue:#3aa3dc; --pink:#ef5da8; --orange:#f4802a;
+    --line:2.5px solid var(--ink); --shadow:5px 5px 0 var(--ink);
+    --display:'Archivo Black','Arial Black',Arial,sans-serif;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{background:var(--bg); color:var(--ink); font-family:'Archivo',Helvetica,Arial,sans-serif;}
+  body::before{content:""; position:fixed; top:0; left:0; right:0; height:8px; z-index:9;
+    background:linear-gradient(90deg,var(--pink) 0 20%,var(--orange) 20% 40%,var(--gold) 40% 60%,var(--blue) 60% 80%,var(--green) 80% 100%);}
+  .wrap{max-width:860px; margin:0 auto; padding:40px 20px 30px;}
+  .hero{text-align:center; padding-top:20px;}
+  .hero svg{width:min(340px,80vw); height:auto;}
+  h1{font-family:var(--display); font-size:clamp(44px,9vw,72px); letter-spacing:-.02em; margin:8px 0 2px;}
+  h1 span{color:var(--pink); text-shadow:3px 3px 0 var(--ink);}
+  .tag{color:var(--muted); font-weight:700; text-transform:uppercase; letter-spacing:.16em; font-size:14px;}
+  .play{display:inline-block; margin:28px auto 8px; background:var(--green); color:#fff; text-decoration:none;
+    font-family:var(--display); font-size:24px; padding:16px 44px; border:var(--line); border-radius:14px;
+    box-shadow:var(--shadow); transition:transform .07s, box-shadow .07s;}
+  .play:active{transform:translate(4px,4px); box-shadow:1px 1px 0 var(--ink);}
+  .sub{color:var(--muted); font-size:13px; font-weight:600; margin-top:10px;}
+  .cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:16px; margin:48px 0 20px;}
+  .card{background:var(--card); border:var(--line); box-shadow:var(--shadow); border-radius:14px; padding:22px; text-align:left;}
+  .card .k{display:inline-block; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:#fff;
+    border:2px solid var(--ink); border-radius:99px; padding:2px 10px; font-weight:800; margin-bottom:10px;}
+  .card h3{font-family:var(--display); font-size:17px; margin-bottom:6px;}
+  .card p{color:#43392c; font-size:14px; line-height:1.55;}
+  .adslot{margin:34px auto; text-align:center; min-height:90px; border:2px dashed #d8ccb4; border-radius:12px;
+    display:flex; align-items:center; justify-content:center; color:#c9bda3; font-weight:700; font-size:12px; letter-spacing:.1em;}
+  footer{text-align:center; padding:26px 0 8px; color:var(--muted); font-size:13px; font-weight:600;}
+  footer a{color:var(--ink);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <svg viewBox="0 0 240 122" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="186" cy="42" r="36" fill="#ef5da8" stroke="#171310" stroke-width="2.5"/>
+      <circle cx="186" cy="42" r="27" fill="#f4802a" stroke="#171310" stroke-width="2.5"/>
+      <circle cx="186" cy="42" r="18" fill="#f5c211" stroke="#171310" stroke-width="2.5"/>
+      <circle cx="186" cy="42" r="9"  fill="#e8452c" stroke="#171310" stroke-width="2.5"/>
+      <path d="M-4,122 Q28,56 78,76 Q132,97 162,72 Q202,42 244,68 L244,122 Z" fill="#3aa3dc" stroke="#171310" stroke-width="2.5"/>
+      <path d="M-4,122 Q44,86 96,98 Q160,112 244,90 L244,122 Z" fill="#9fd4ef" stroke="#171310" stroke-width="2.5"/>
+      <circle cx="118" cy="62" r="15" fill="#fffcf2" stroke="#171310" stroke-width="2.5"/>
+      <polygon points="118,55 124,60 122,67 114,67 112,60" fill="#171310"/>
+      <path d="M118,47 v8 M105,58 l7,2 M131,58 l-7,2" stroke="#171310" stroke-width="2" fill="none"/>
+    </svg>
+    <h1>WONDER<span>KID</span></h1>
+    <div class="tag">A football life · one decision at a time</div>
+    <a class="play" href="play.html">▶ PLAY FREE</a>
+    <div class="sub">No download · works on your phone · your career auto-saves</div>
+  </div>
+
+  <div class="cards">
+    <div class="card">
+      <span class="k" style="background:var(--pink)">The Rise</span>
+      <h3>From mud to marble</h3>
+      <p>Start at 16 on a pitch that's 60% mud. Train, transfer, and talk your way up five leagues — if your form holds and your agent behaves.</p>
+    </div>
+    <div class="card">
+      <span class="k" style="background:var(--orange)">The Choices</span>
+      <h3>Every decision counts</h3>
+      <p>Big-money agent or the sensible one? Night out or early night? Push through the injury or rest? Your career is the sum of your answers.</p>
+    </div>
+    <div class="card">
+      <span class="k" style="background:var(--blue)">The Chase</span>
+      <h3>The Ballon d'Or</h3>
+      <p>Only a world-class season at the very top puts you in the vote — and even then, the vote can betray you. Most careers never touch it. Will yours?</p>
+    </div>
+  </div>
+
+  <!-- AdSense slot: replace this div's contents with your ad unit code after approval -->
+  <div class="adslot">AD SPACE</div>
+
+  <footer>
+    © 2026 Wonderkid · <a href="privacy.html">Privacy Policy</a>
+  </footer>
+</div>
+</body>
+</html>

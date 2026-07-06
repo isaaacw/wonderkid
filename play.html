@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Play Wonderkid — A Football Life</title>
+<meta name="description" content="Play Wonderkid free in your browser. A football career sim where every decision counts.">
+
+<!-- ============ GOOGLE ADSENSE ============
+Paste your AdSense snippet here after approval (same as index.html).
+========================================= -->
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@600;800&display=swap');
+  :root{--bg:#f6eedd; --ink:#171310; --pink:#ef5da8; --orange:#f4802a; --gold:#f5c211; --blue:#3aa3dc; --green:#2f9e44;}
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{background:var(--bg); font-family:'Archivo',Helvetica,Arial,sans-serif; display:flex; flex-direction:column;}
+  header{height:54px; display:flex; align-items:center; justify-content:space-between; padding:8px 16px 0;
+    border-bottom:2.5px solid var(--ink);
+    background:linear-gradient(90deg,var(--pink) 0 20%,var(--orange) 20% 40%,var(--gold) 40% 60%,var(--blue) 60% 80%,var(--green) 80% 100%) top/100% 8px no-repeat, #fffcf2;}
+  header a{font-family:'Archivo Black','Arial Black',Arial,sans-serif; font-size:18px; color:var(--ink); text-decoration:none;}
+  header a span{color:var(--pink);}
+  header .back{font-family:'Archivo',Arial,sans-serif; font-weight:800; font-size:13px;}
+  #game{flex:1; width:100%; border:none; display:block;}
+  .adbar{min-height:60px; border-top:2.5px solid var(--ink); background:#fffcf2; display:flex; align-items:center;
+    justify-content:center; color:#c9bda3; font-weight:700; font-size:11px; letter-spacing:.1em;}
+</style>
+</head>
+<body>
+<header>
+  <a href="index.html">WONDER<span>KID</span></a>
+  <a class="back" href="index.html">← home</a>
+</header>
+<iframe id="game" src="wonderkid.html" title="Wonderkid game"></iframe>
+<!-- AdSense slot: replace this div's contents with your ad unit code after approval -->
+<div class="adbar">AD SPACE</div>
+</body>
+</html>

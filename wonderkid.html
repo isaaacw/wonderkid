@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Wonderkid — A Football Life</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;600;700;800&display=swap');
+  :root{
+    --bg:#f6eedd; --card:#fffcf2; --card2:#ffffff; --ink:#171310; --muted:#7c7060;
+    --green:#2f9e44; --green2:#2f9e44; --gold:#f5c211; --red:#e8452c; --blue:#3aa3dc;
+    --pink:#ef5da8; --orange:#f4802a;
+    --radius:14px; --line:2.5px solid var(--ink); --shadow:4px 4px 0 var(--ink);
+    --display:'Archivo Black','Arial Black',Arial,sans-serif;
+  }
+  *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:'Archivo',-apple-system,'Helvetica Neue',Helvetica,Arial,sans-serif;
+    display:flex; justify-content:center;
+  }
+  body::before{content:""; position:fixed; top:0; left:0; right:0; height:8px; z-index:9;
+    background:linear-gradient(90deg,var(--pink) 0 20%,var(--orange) 20% 40%,var(--gold) 40% 60%,var(--blue) 60% 80%,var(--green) 80% 100%);}
+  #app{width:100%; max-width:480px; min-height:100%; display:flex; flex-direction:column; padding:18px 12px 12px; position:relative;}
+
+  /* ---------- HUD ---------- */
+  #hud{display:none; background:var(--card); border:var(--line); box-shadow:var(--shadow);
+    border-radius:var(--radius); padding:12px 14px; margin-bottom:14px;}
+  #hud .row1{display:flex; justify-content:space-between; align-items:baseline;}
+  #hud .pname{font-family:var(--display); font-size:16px; letter-spacing:-.01em;}
+  #hud .ovr{font-family:var(--display); font-size:22px; color:var(--ink); background:var(--gold);
+    border:2px solid var(--ink); border-radius:99px; padding:1px 12px;}
+  #hud .row2{display:flex; justify-content:space-between; color:var(--muted); font-size:12.5px; margin-top:4px; font-weight:600;}
+  #hud .bars{display:flex; gap:8px; margin-top:10px;}
+  .mini{flex:1;}
+  .mini .lbl{font-size:10px; letter-spacing:.06em; color:var(--ink); font-weight:800; text-transform:uppercase; display:flex; justify-content:space-between;}
+  .mini .track{height:9px; background:#fff; border:2px solid var(--ink); border-radius:5px; margin-top:3px; overflow:hidden;}
+  .mini .fill{height:100%; transition:width .6s cubic-bezier(.2,.8,.2,1);}
+  .attrs{display:flex; justify-content:space-between; margin-top:10px; font-size:10.5px; color:var(--muted); font-weight:700; letter-spacing:.04em;}
+  .attrs b{color:var(--ink); font-size:13px; font-family:var(--display);}
+
+  /* ---------- Cards ---------- */
+  #stage{flex:1; display:flex; flex-direction:column; gap:10px;}
+  .card{background:var(--card); border:var(--line); box-shadow:var(--shadow); border-radius:var(--radius); padding:18px;
+    animation:pop .35s cubic-bezier(.2,.8,.2,1);}
+  @keyframes pop{from{opacity:0; transform:translateY(14px) scale(.98);} to{opacity:1; transform:none;}}
+  .card h2{font-family:var(--display); font-size:19px; margin-bottom:8px; letter-spacing:-.01em;}
+  .card .kicker{font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:#fff; background:var(--pink);
+    border:2px solid var(--ink); border-radius:99px; padding:2px 10px; display:inline-block; font-weight:800; margin-bottom:8px;}
+  .card p{color:#43392c; font-size:14.5px; line-height:1.55;}
+  .headline{font-family:var(--display); font-size:16px; line-height:1.35; margin-bottom:6px;}
+
+  .btn{display:block; width:100%; border:var(--line); border-radius:12px; padding:13px 16px; margin-top:10px;
+    font-family:'Archivo',Arial,sans-serif; font-size:15px; font-weight:800; color:#fff; background:var(--green);
+    cursor:pointer; text-align:left; box-shadow:var(--shadow); transition:transform .07s, box-shadow .07s;}
+  .btn:active{transform:translate(3px,3px); box-shadow:1px 1px 0 var(--ink);}
+  .btn.alt{background:var(--card2); color:var(--ink);}
+  .btn.gold{background:var(--gold); color:var(--ink);}
+  .btn .sub{display:block; font-size:12px; font-weight:600; opacity:.8; margin-top:2px;}
+  .btn:disabled{opacity:.4; cursor:default;}
+
+  /* ---------- Match ticker ---------- */
+  .score{display:flex; justify-content:center; align-items:center; gap:14px; font-family:var(--display); font-size:26px; margin:10px 0;}
+  .score .team{font-size:12px; font-weight:800; font-family:'Archivo',Arial,sans-serif; color:var(--muted); max-width:130px; text-align:center; text-transform:uppercase; letter-spacing:.04em;}
+  .rating-badge{display:inline-block; min-width:52px; text-align:center; padding:8px 12px; border-radius:99px;
+    border:var(--line); box-shadow:3px 3px 0 var(--ink); font-family:var(--display); font-size:18px; color:var(--ink);}
+  .events{margin-top:8px; font-size:13.5px; color:#43392c; font-weight:600;}
+  .events div{padding:3px 0; opacity:0; animation:tick .4s forwards;}
+  @keyframes tick{to{opacity:1;}}
+
+  /* ---------- Stat rows / summary ---------- */
+  .srow{display:flex; justify-content:space-between; padding:7px 0; border-bottom:2px dashed #d8ccb4; font-size:14px; font-weight:600;}
+  .srow:last-child{border-bottom:none;}
+  .srow b{font-weight:800;}
+  .pill{display:inline-block; background:var(--card2); border:2px solid var(--ink); padding:3px 10px; border-radius:99px;
+    font-size:12px; font-weight:700; margin:3px 3px 0 0; color:var(--ink);}
+  .trophy{color:var(--orange); font-weight:800;}
+
+  /* ---------- Season progress ---------- */
+  #seasonbar{display:none; margin-top:12px;}
+  #seasonbar .lbl{font-size:11px; font-weight:800; color:var(--muted); display:flex; justify-content:space-between; margin-bottom:4px; text-transform:uppercase; letter-spacing:.05em;}
+  #seasonbar .track{height:11px; background:#fff; border:2px solid var(--ink); border-radius:6px; overflow:hidden;}
+  #seasonbar .fill{height:100%; background:repeating-linear-gradient(45deg,var(--green) 0 10px,var(--gold) 10px 20px); transition:width .5s;}
+
+  /* ---------- Start screen ---------- */
+  .poster-art{display:flex; justify-content:center; margin-top:10px;}
+  .poster-art svg{width:230px; height:auto;}
+  .logo{text-align:center; margin:10px 0 2px; font-family:var(--display); font-size:38px; letter-spacing:-.02em;}
+  .logo span{color:var(--pink); text-shadow:2px 2px 0 var(--ink);}
+  .tag{text-align:center; color:var(--muted); font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.14em; margin-bottom:18px;}
+  input[type=text], select{width:100%; background:#fff; border:var(--line); color:var(--ink); font-weight:600;
+    border-radius:12px; padding:13px 14px; font-size:15px; margin-top:8px; outline:none; font-family:inherit;}
+  .choice-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px;}
+  .chip{background:#fff; border:var(--line); border-radius:12px; padding:12px; cursor:pointer; text-align:center;}
+  .chip .t{font-weight:800; font-size:14px;}
+  .chip .d{font-size:11px; color:var(--muted); margin-top:3px; line-height:1.35; font-weight:600;}
+  .chip.sel{background:var(--gold); box-shadow:3px 3px 0 var(--ink);}
+
+  .big{font-family:var(--display); font-size:40px; text-align:center; margin:8px 0;}
+  .grade{font-family:var(--display); font-size:72px; text-align:center; color:var(--orange); -webkit-text-stroke:2.5px var(--ink); margin:6px 0;}
+  .center{text-align:center;}
+  .money{color:var(--green); font-weight:800;}
+  .warn{color:var(--red); font-weight:800;}
+  .fadein{animation:pop .35s;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hud"></div>
+  <div id="stage"></div>
+  <div id="seasonbar">
+    <div class="lbl"><span id="sb-label"></span><span id="sb-week"></span></div>
+    <div class="track"><div class="fill" id="sb-fill" style="width:0%"></div></div>
+  </div>
+</div>
+<script>
+/* ============================================================
+   WONDERKID — A Football Life
+   Decision-based football career sim. Single file, no deps.
+   ============================================================ */
+
+/* ---------- AD HOOK (for later monetization) ----------
+   When you publish to CrazyGames/Poki, their SDK gets wired in here.
+   Locally this does nothing — the game just continues.        */
+function adBreak(done){
+  // Example for CrazyGames (uncomment after adding their SDK script):
+  // window.CrazyGames.SDK.ad.requestAd("midgame", {adFinished:done, adError:done});
+  done();
+}
+
+/* ---------------- DATA ---------------- */
+const LEAGUES = [
+  {name:"Meadow League Two",     country:"Albion",  avg:46, wageMult:0.6},
+  {name:"Meadow League One",     country:"Albion",  avg:56, wageMult:1.2},
+  {name:"Albion Championship",   country:"Albion",  avg:66, wageMult:3},
+  {name:"Albion Premier League", country:"Albion",  avg:76, wageMult:9},
+  {name:"Continental Elite",     country:"Europe",  avg:83, wageMult:20},
+];
+const CLUB_NAMES = [
+  ["Bramble Rovers","Hartsfield Town","Dockyard Athletic","Millbrook United","Kettlewich FC","Ashcombe Wanderers"],
+  ["Ironbridge City","Saltmarsh Albion","Redwick Rangers","Fenport County","Oakhurst Town","Colliery FC"],
+  ["Blackmoor City","Kingsreach United","Harborne Athletic","Westcliff FC","Stonegate Rovers","Vale Park FC"],
+  ["Albion City","Merchants FC","Crown Park Rangers","Northgate United","Riverhall FC","Grand Union FC"],
+  ["Real Costa Dorada","Bayern Adler","AC Fortezza","Paris Lumière","Sporting Atlântico","Ajax Oranje"]
+];
+const COUNTRIES = ["England","Brazil","France","Spain","Germany","Argentina","Nigeria","USA","Japan","Netherlands","Portugal","Croatia"];
+const POSITIONS = {
+  ST:{label:"Striker",     d:"Goals win Ballon d'Ors", goalMult:1.0,  astMult:0.35},
+  W: {label:"Winger",      d:"Flair, pace, highlights", goalMult:0.6, astMult:0.8},
+  AM:{label:"Playmaker",   d:"The one who makes it tick", goalMult:0.45, astMult:1.0},
+  CB:{label:"Defender",    d:"Respected, rarely famous", goalMult:0.12, astMult:0.1},
+};
+const TRAITS = {
+  finisher:{t:"Natural Finisher", d:"+ goals per chance"},
+  rocket:  {t:"Rocket Pace",      d:"Faster development of pace-based play"},
+  iron:    {t:"Iron Body",        d:"Half as many injuries"},
+  media:   {t:"Media Darling",    d:"Reputation grows faster"},
+  late:    {t:"Late Bloomer",     d:"Keep improving until 30"},
+  captain: {t:"Born Leader",      d:"Morale dips hurt less, captaincy sooner"},
+};
+const FIRST=["Alex","Marco","Kai","Leo","Sam","Diego","Yusuf","Tom","Andrés","Jude","Nico","Erik"];
+const LAST=["Fletcher","Moreau","Santos","Vance","Okafor","Kimura","Berg","Iversen","Romero","Whitlock","Duval","Keane"];
+
+/* ---------------- STATE ---------------- */
+let S = null;
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const ri=(a,b)=>Math.floor(rnd(a,b+1));
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const pick=arr=>arr[Math.floor(Math.random()*arr.length)];
+const fmtM=n=>{
+  if(Math.abs(n)>=1e6) return "£"+(n/1e6).toFixed(1)+"m";
+  if(Math.abs(n)>=1e3) return "£"+(n/1e3).toFixed(0)+"k";
+  return "£"+Math.round(n);
+};
+const ord=n=>{const s=["th","st","nd","rd"],v=n%100;return n+(s[(v-20)%10]||s[v]||s[0]);};
+
+function newGame(name,country,pos,traits){
+  const club = makeClub(0);
+  S = {
+    name, country, pos, traits,
+    age:16, season:1, week:0,
+    attrs:{tec: ri(40,48), pac: ri(40,48), phy: ri(33,41), men: ri(33,41)},
+    pot: ri(86,99),
+    form:50, morale:70, fitness:100, rep:5,
+    money:0, wage:180, tier:0, club, role:"prospect",
+    training:"tec", injury:0, contractYears:2,
+    ssn:{apps:0,goals:0,assists:0,rsum:0,motm:0},
+    car:{apps:0,goals:0,assists:0,caps:0,intGoals:0,earnings:0,trophies:[],awards:[],clubs:[club.name],ballonDor:0,seasons:[]},
+    flags:{}, pendingEvent:null, phase:"week"
+  };
+  if(traits.includes("rocket")) S.attrs.pac+=6;
+  if(traits.includes("finisher")) S.attrs.tec+=4;
+  save();
+}
+function makeClub(tier){
+  const league=LEAGUES[tier];
+  return {name:pick(CLUB_NAMES[tier]), tier, str:clamp(league.avg+ri(-6,6),40,95)};
+}
+function ovr(){
+  const a=S.attrs, w={ST:[.38,.22,.2,.2],W:[.34,.3,.14,.22],AM:[.42,.16,.14,.28],CB:[.24,.18,.34,.24]}[S.pos];
+  return Math.round(a.tec*w[0]+a.pac*w[1]+a.phy*w[2]+a.men*w[3]);
+}
+function save(){ try{localStorage.setItem("wonderkid_save",JSON.stringify(S));}catch(e){} }
+function load(){ try{const d=localStorage.getItem("wonderkid_save"); if(d){S=JSON.parse(d); return true;}}catch(e){} return false; }
+function wipe(){ try{localStorage.removeItem("wonderkid_save");}catch(e){} }
+
+/* ---------------- EVENTS LIBRARY ---------------- */
+/* Each: {id, cond(S), kicker, head, body, choices:[{label,sub,fx,out}]}
+   fx = function applying effects; out = result text (string or fn) */
+const EVENTS = [
+ {id:"agent", cond:s=>s.age===17&&!s.flags.agent, kicker:"Off the pitch", head:"Two agents want to sign you.",
+  body:"Slick 'Big Ray' Rayner promises money and moves. Quiet local agent Priya Sharma promises the right moves.",
+  choices:[
+   {label:"Sign with Big Ray", sub:"More money, more drama", fx:s=>{s.flags.agent="ray"; s.rep+=4; s.wage*=1.3;}, out:"Ray gets you a boot deal within a week. He also gets photographed falling out of a nightclub. With your card."},
+   {label:"Sign with Priya", sub:"Career-first guidance", fx:s=>{s.flags.agent="priya"; s.morale+=8; s.attrs.men+=2;}, out:"Priya's first advice: 'Train. Sleep. Say nothing stupid on the internet.' Solid."}
+  ]},
+ {id:"nightout", cond:s=>s.age>=18&&s.age<=24&&s.form>55, kicker:"Dressing room", head:"The lads are going out after the win. Big night planned.",
+  body:"The captain says team bonding matters. Your hamstrings say otherwise.",
+  choices:[
+   {label:"Go out", sub:"+morale, risk to form", fx:s=>{s.morale+=10; if(Math.random()<0.4){s.form-=12; s.flags.tabloid=true;} }, out:s=>s.flags.tabloid?"Great night. Less great: the back page reads 'STARLET IN 3AM KEBAB SHAME'.":"Great night, no headlines. The dressing room loves you."},
+   {label:"Head home", sub:"+form, the lads notice", fx:s=>{s.form+=6; s.morale-=4;}, out:"You're fresh as a daisy in training Monday. The banter about your 'granny lifestyle' writes itself."}
+  ]},
+ {id:"interview", cond:s=>s.rep>=15, kicker:"Media", head:"Live TV interview after your strong run of form.",
+  body:"The presenter leans in: 'Are you the best young player in the league?'",
+  choices:[
+   {label:"'Honestly? Yes.'", sub:"Bold. Very bold.", fx:s=>{s.rep+=6; s.form-=4; s.flags.target=true;}, out:"Clips everywhere. Defenders now introduce themselves to your ankles personally."},
+   {label:"'I just focus on the team.'", sub:"Safe, professional", fx:s=>{s.morale+=4; s.rep+=2;}, out:"Boring answer. Your manager texts you a single thumbs up. That's high praise from him."}
+  ]},
+ {id:"sponsor", cond:s=>s.rep>=25&&!s.flags.boots, kicker:"Business", head:"Boot sponsorship offer on the table.",
+  body:"'Velocity Sports' offers a deal. There's also a smaller brand offering less money but a signature boot later.",
+  choices:[
+   {label:"Take the big deal", sub:"Instant payday", fx:s=>{s.flags.boots=true; s.money+=80000*(s.tier+1); s.rep+=3;}, out:"The cheque clears. The boots are luminous orange. Your nan says you look like a traffic cone. A rich traffic cone."},
+   {label:"Bet on yourself", sub:"Smaller now, bigger later", fx:s=>{s.flags.boots="signature"; s.money+=20000*(s.tier+1);}, out:"You sign the smaller deal. If you make it big, the 'WK' signature line will print money."}
+  ]},
+ {id:"gaffer", cond:s=>s.form<40, kicker:"Training ground", head:"The manager pulls you aside. He is not smiling.",
+  body:"'Your form is a disgrace to that shirt. What are you going to do about it?'",
+  choices:[
+   {label:"Extra sessions every day", sub:"+form, -fitness", fx:s=>{s.form+=14; s.fitness-=10; s.attrs.men+=1;}, out:"Two weeks of double sessions. Your legs hate you. Your stats don't."},
+   {label:"'Play me in my proper role and see.'", sub:"Risky chat", fx:s=>{if(Math.random()<0.5){s.form+=10; s.morale+=8;}else{s.morale-=10; s.role="rotation";}}, out:s=>s.morale>60?"He actually listens. New role, new you.":"Wrong answer. You're introduced to the bench. It's cold there."}
+  ]},
+ {id:"derby", cond:s=>s.week===5, kicker:"Fixture list", head:"Derby week. The city stops.",
+  body:"Local radio hasn't talked about anything else for days. Your barber gives you a free cut 'for luck'.",
+  choices:[
+   {label:"Soak up the pressure", sub:"Big performance chance", fx:s=>{s.flags.derby=true;}, out:"You feel it in your chest on the bus to the ground. This is why you play."},
+   {label:"Treat it like any game", sub:"Steady, no bonus", fx:s=>{s.form+=3;}, out:"'It's three points like any other,' you tell reporters, lying through your teeth."}
+  ]},
+ {id:"invest", cond:s=>s.money>150000&&!s.flags.invested, kicker:"Finances", head:"Your agent suggests investing your savings.",
+  body:"Options: property ('boring, works') or your teammate's cryptocurrency, 'BallerCoin'.",
+  choices:[
+   {label:"Property", sub:"Steady growth", fx:s=>{s.flags.invested=true; s.money*=1.25;}, out:"You buy two flats in a commuter town. Riveting stuff. Reliable stuff."},
+   {label:"BallerCoin", sub:"To the moon?", fx:s=>{s.flags.invested=true; s.money*= (Math.random()<0.25?3:0.4);}, out:s=>s.money>200000?"BallerCoin actually moons. Your teammate now calls himself 'The Wolf of the Warm-Up'.":"BallerCoin is now worth less than an actual football. Lesson learned."}
+  ]},
+ {id:"callup", cond:s=>s.rep>=40&&s.age>=19&&!s.flags.capped, kicker:"International", head:"THE CALL. Your country wants you.",
+  body:s=>`The ${s.country} squad list is out — and your name is on it. Your phone has 74 missed calls, 40 of them from your mum.`,
+  choices:[
+   {label:"Report for duty", sub:"Make your debut", fx:s=>{s.flags.capped=true; s.car.caps+=1; s.rep+=8; s.morale+=12; if(Math.random()<0.4&&s.pos!=="CB"){s.car.intGoals++; s.flags.debutGoal=true;}}, out:s=>s.flags.debutGoal?"DEBUT GOAL. The commentator screams your name so hard he loses his voice.":"You come on for the last 20 minutes. Cap number one. Nobody can ever take it away."}
+  ]},
+ {id:"injury_choice", cond:s=>s.fitness<55, kicker:"Medical room", head:"The physio frowns at your scan.",
+  body:"'Nothing torn — yet. You can push through, or rest two weeks and let it settle.'",
+  choices:[
+   {label:"Push through", sub:"Keep playing, risk it", fx:s=>{if(Math.random()<0.45){s.injury=ri(3,6); s.form-=10;}else{s.men+=0; s.form+=5;}}, out:s=>s.injury>0?"It goes in the 20th minute. You knew. You always know.":"You grit through it and the pain fades. Warrior stuff."},
+   {label:"Rest up", sub:"Miss 2 weeks", fx:s=>{s.injury=2; s.fitness=90;}, out:"Two weeks of pool sessions and daytime TV. Your body says thank you."}
+  ]},
+ {id:"newdeal", cond:s=>s.contractYears<=1&&s.form>50, kicker:"Contract", head:"The club slides a new contract across the table.",
+  body:s=>`Improved terms: ${fmtM(s.wage*1.6)}/week for 3 years. Your agent thinks you could get more elsewhere.`,
+  choices:[
+   {label:"Sign it", sub:"Security + loyalty", fx:s=>{s.wage*=1.6; s.contractYears=3; s.morale+=8;}, out:"The fans sing your name at the next home game. That never gets old."},
+   {label:"Hold off", sub:"Bet on a transfer", fx:s=>{s.contractYears=1; s.rep+=2; s.flags.wantaway=true;}, out:"'Contract Standoff' reads the paper. The transfer window will be interesting."}
+  ]},
+ {id:"charity", cond:s=>s.rep>=30&&!s.flags.charity, kicker:"Community", head:"A local kid's club asks you to fund new pitches.",
+  body:s=>`It would cost ${fmtM(50000*(s.tier+1))}. It's also where you learned to play.`,
+  choices:[
+   {label:"Pay for all of it", sub:"-money, +soul", fx:s=>{s.flags.charity=true; s.money-=50000*(s.tier+1); s.rep+=6; s.morale+=10;}, out:"They name the main pitch after you. You pretend you have something in your eye at the opening."},
+   {label:"Share a nice post instead", sub:"Free", fx:s=>{s.flags.charity=true; s.rep+=1;}, out:"'Thoughts with the grassroots game 🙏' — 40k likes. The pitches remain mud."}
+  ]},
+ {id:"style", cond:s=>s.age>=20&&s.rep>=50&&!s.flags.icon, kicker:"Brand", head:"Time to define your image, says your agent.",
+  body:"Every great player is recognisable from 100 yards. What's your thing?",
+  choices:[
+   {label:"Trademark celebration", sub:"+rep on every goal", fx:s=>{s.flags.icon="celebration"; s.rep+=4;}, out:"You debut 'The Heron' — one leg, arms wide. Kids do it in playgrounds within a month."},
+   {label:"Mysterious and humble", sub:"Slow-burn respect", fx:s=>{s.flags.icon="humble"; s.attrs.men+=3;}, out:"No interviews, no fuss, just football. Pundits call you 'refreshing' 11 times in one broadcast."}
+  ]},
+ {id:"rival", cond:s=>s.age>=21&&s.rep>=45&&!s.flags.rival, kicker:"Rivalry", head:"A rival player mocks you in the press.",
+  body:s=>`"${s.name}? Overrated. I'd play him every week," says the league's other golden boy, Danilo Reyes.`,
+  choices:[
+   {label:"Reply on the pitch", sub:"Fuel the fire quietly", fx:s=>{s.flags.rival=true; s.form+=10;}, out:"You screenshot the quote and set it as your phone wallpaper. Motivation: infinite."},
+   {label:"Roast him online", sub:"Public beef", fx:s=>{s.flags.rival=true; s.rep+=6; s.morale-=3; s.form-=3;}, out:"Your reply gets 200k likes and one FA warning about 'social media conduct'."}
+  ]},
+];
+
+/* ---------------- ENGINE ---------------- */
+const WEEKS = 9; // match blocks per season (each ≈ 4 matches)
+
+function trainingGain(){
+  const lateCap = S.traits.includes("late") ? 30 : 27;
+  const growth = S.age<=20 ? 2.7 : S.age<=23 ? 1.9 : S.age<=lateCap ? 1.1 : (S.age<=lateCap+2?0.4:0);
+  if(growth<=0) return;
+  const roleMin = {prospect:0.7, rotation:0.95, starter:1.15, star:1.25}[S.role];
+  let g = growth*roleMin*rnd(0.7,1.4)*(1+S.tier*0.08); // better league = better coaching
+  const a=S.attrs, cap=S.pot+S.tier*2;                  // elite environment raises your ceiling
+  const bump=(k,amt)=>{a[k]=clamp(a[k]+amt,20,cap);};
+  bump(S.training, g);
+  bump(pick(["tec","pac","phy","men"]), g*0.4);
+  // age decline
+  if(S.age>=31){ a.pac=clamp(a.pac-rnd(0.4,1.0),20,99); if(S.age>=34){a.phy-=rnd(0.3,0.8); a.tec-=rnd(0.1,0.4);} }
+}
+
+function simWeek(){
+  // returns a match-block result object
+  const league=LEAGUES[S.tier];
+  if(S.injury>0){
+    S.injury--; S.form=clamp(S.form-3,0,100); S.fitness=clamp(S.fitness+18,0,100);
+    return {injured:true};
+  }
+  const minutes={prospect:0.35,rotation:0.6,starter:0.95,star:1}[S.role];
+  const apps=Math.round(4*minutes*rnd(0.7,1.05));
+  let goals=0,assists=0,rsum=0,motm=0;
+  const diff=(ovr()-league.avg)/7.5;
+  const p=POSITIONS[S.pos];
+  const derby = S.flags.derby; S.flags.derby=false;
+  for(let i=0;i<apps;i++){
+    let r=6.1+diff+(S.form-50)/55+(S.fitness-70)/100+rnd(-1.1,1.1)+(derby&&i===0?0.8:0);
+    r=clamp(r,3.5,10);
+    const gChance=clamp((r-5.4)*0.28*p.goalMult*(S.attrs.tec/70)*(S.traits.includes("finisher")?1.3:1),0,0.95);
+    const g=(Math.random()<gChance?1:0)+(Math.random()<gChance*0.3?1:0);
+    const as=Math.random()<clamp((r-5.4)*0.25*p.astMult,0,0.8)?1:0;
+    goals+=g; assists+=as; r=clamp(r+g*0.7+as*0.4,3.5,10); rsum+=r;
+    if(r>=8.3)motm++;
+  }
+  const avg=apps?rsum/apps:0;
+  S.ssn.apps+=apps; S.ssn.goals+=goals; S.ssn.assists+=assists; S.ssn.rsum+=rsum; S.ssn.motm+=motm;
+  S.form=clamp(S.form+(avg-6.2)*5+(50-S.form)*0.12+rnd(-2,2),5,98);
+  S.fitness=clamp(S.fitness-apps*2.2-(S.traits.includes("iron")?0:2)+6,25,100);
+  const repCap=[35,55,75,92,100][S.tier]; // small-league heroes aren't global stars
+  S.rep=clamp(S.rep+(avg>7?(S.traits.includes("media")?1.6:1):(avg>6.2?0.4:-0.3))+goals*0.25*(S.tier*0.4+0.4)+(S.flags.icon==="celebration"?goals*0.15:0),0,repCap);
+  // injury chance
+  if(Math.random()<(S.fitness<45?0.16:0.05)*(S.traits.includes("iron")?0.45:1)){ S.injury=ri(1,3); }
+  // promotion of role
+  if(avg>6.9&&Math.random()<0.6) S.role={prospect:"rotation",rotation:"starter",starter:"star",star:"star"}[S.role];
+  if(avg<5.4&&Math.random()<0.4) S.role={star:"starter",starter:"rotation",rotation:"rotation",prospect:"prospect"}[S.role];
+  // wages accumulate (block ≈ 4 weeks)
+  const pay=S.wage*4*LEAGUES[S.tier].wageMult; S.money+=pay; S.car.earnings+=pay;
+  trainingGain();
+  // int'l duty mid-season
+  let intl=null;
+  if(S.flags.capped&&Math.random()<0.3){
+    S.car.caps++; const ig=(S.pos!=="CB"&&Math.random()<0.35)?1:0; S.car.intGoals+=ig;
+    intl={caps:1,goals:ig};
+  }
+  return {apps,goals,assists,avg,motm,injuredNow:S.injury>0&&true,intl,derby};
+}
+
+function seasonEnd(){
+  const avg=S.ssn.apps?S.ssn.rsum/S.ssn.apps:0;
+  const res={avg, ...S.ssn, awards:[], trophy:null, offers:[]};
+  // league outcome
+  const teamScore=(avg-6.3)*3 + rnd(-5,5);
+  res.pos=clamp(Math.round(10.5-teamScore*1.8+rnd(-2,2)),1,20);
+  if(res.pos===1){ res.trophy=(S.tier===4?"Continental Elite Title":LEAGUES[S.tier].name+" Title"); S.car.trophies.push(res.trophy); S.rep=clamp(S.rep+6,0,100); }
+  // awards
+  if(avg>7.3&&S.ssn.goals>=15&&S.pos!=="CB"){res.awards.push("League Top Scorer"); S.rep=clamp(S.rep+5,0,100);}
+  if(avg>7.5){res.awards.push("Team of the Season"); S.rep=clamp(S.rep+4,0,100);}
+  // Ballon d'Or: the reason to keep playing. World-class season, at the top,
+  // in a title race, world-famous — and even then the vote can betray you.
+  if(S.tier===4&&S.rep>85&&avg>7.4+S.car.ballonDor*0.15){
+    if(res.pos<=2&&Math.random()<0.4){res.awards.push("🏆 BALLON D'OR"); S.car.ballonDor++; S.rep=100;}
+    else res.awards.push("Ballon d'Or: 2nd in the vote. Robbed.");
+  }
+  S.car.awards.push(...res.awards);
+  S.car.apps+=S.ssn.apps; S.car.goals+=S.ssn.goals; S.car.assists+=S.ssn.assists;
+  S.car.seasons.push({season:S.season, age:S.age, club:S.club.name, pos:res.pos, ...S.ssn, avg:+avg.toFixed(2)});
+  // transfer offers
+  if(S.tier<4 && (avg>6.8||S.flags.wantaway) && ovr()>=LEAGUES[S.tier+1].avg-8){
+    const up=makeClub(S.tier+1);
+    res.offers.push({club:up, tier:S.tier+1, wage:S.wage*rnd(1.6,2.4)});
+  }
+  if(avg>7.6&&S.tier<3&&ovr()>=LEAGUES[S.tier+2].avg-6){ const up2=makeClub(S.tier+2); res.offers.push({club:up2,tier:S.tier+2,wage:S.wage*rnd(4,6)}); }
+  S.contractYears--; S.flags.wantaway=false;
+  return res;
+}
+
+function ageUp(){
+  S.age++; S.season++; S.week=0;
+  // repeatable events can fire again next season
+  ["nightout","interview","gaffer","derby","injury_choice","newdeal"].forEach(id=>delete S.flags["done_"+id]);
+  S.flags.tabloid=false;
+  S.ssn={apps:0,goals:0,assists:0,rsum:0,motm:0};
+  S.fitness=100; S.form=clamp(S.form*0.5+25,20,80);
+  if(S.contractYears<=0){S.contractYears=2; S.wage*=1.15;}
+  save();
+}
+
+function legacy(){
+  const c=S.car;
+  const pts=c.goals*2+c.assists*1.2+c.apps*0.4+c.trophies.length*90+c.awards.length*60+c.caps*4+c.intGoals*6+c.ballonDor*400;
+  let grade="D",title="Sunday League Legend (your mates' league)";
+  if(pts>250){grade="C";title="Solid Pro — a good career, honest work";}
+  if(pts>700){grade="B";title="Fan Favourite — they still sing your song";}
+  if(pts>1400){grade="A";title="Club Legend — there's a stand named after you";}
+  if(pts>2400){grade="S";title="ICON — kids are named after you now";}
+  if(c.ballonDor>=3){grade="GOAT";title="The greatest to ever lace them up. Ever.";}
+  return {pts:Math.round(pts),grade,title};
+}
+
+/* ---------------- UI ---------------- */
+const $=id=>document.getElementById(id);
+const stage=$("stage");
+
+function hud(){
+  const h=$("hud");
+  if(!S){h.style.display="none";$("seasonbar").style.display="none";return;}
+  h.style.display="block";
+  const bar=(l,v,c)=>`<div class="mini"><div class="lbl"><span>${l}</span><span>${Math.round(v)}</span></div><div class="track"><div class="fill" style="width:${v}%;background:${c}"></div></div></div>`;
+  h.innerHTML=`
+    <div class="row1"><span class="pname">${S.name} <span style="color:var(--muted);font-weight:600;font-size:12px">${POSITIONS[S.pos].label} · ${S.age}y</span></span><span class="ovr">${ovr()}</span></div>
+    <div class="row2"><span>${S.club.name} · ${LEAGUES[S.tier].name}</span><span class="money">${fmtM(S.money)}</span></div>
+    <div class="bars">${bar("Form",S.form,"var(--green)")}${bar("Fitness",S.fitness,"var(--blue)")}${bar("Morale",S.morale,"#e67e22")}${bar("Fame",S.rep,"var(--gold)")}</div>
+    <div class="attrs">
+      <span>TEC <b>${Math.round(S.attrs.tec)}</b></span><span>PAC <b>${Math.round(S.attrs.pac)}</b></span>
+      <span>PHY <b>${Math.round(S.attrs.phy)}</b></span><span>MEN <b>${Math.round(S.attrs.men)}</b></span>
+      <span>WAGE <b>${fmtM(S.wage*LEAGUES[S.tier].wageMult)}</b>/wk</span>
+    </div>`;
+  $("seasonbar").style.display="block";
+  $("sb-label").textContent=`Season ${S.season} · ${S.club.name}`;
+  $("sb-week").textContent=S.week>=WEEKS?"Season complete":`Match block ${S.week+1}/${WEEKS}`;
+  $("sb-fill").style.width=(S.week/WEEKS*100)+"%";
+}
+function card(html){ stage.innerHTML=`<div class="card">${html}</div>`; hud(); }
+
+/* ---------- Screens ---------- */
+function screenStart(){
+  const hasSave=(()=>{try{return !!localStorage.getItem("wonderkid_save");}catch(e){return false;}})();
+  S=null; hud();
+  stage.innerHTML=`
+   <div class="poster-art"><svg viewBox="0 0 240 122" xmlns="http://www.w3.org/2000/svg">
+     <circle cx="186" cy="42" r="36" fill="#ef5da8" stroke="#171310" stroke-width="2.5"/>
+     <circle cx="186" cy="42" r="27" fill="#f4802a" stroke="#171310" stroke-width="2.5"/>
+     <circle cx="186" cy="42" r="18" fill="#f5c211" stroke="#171310" stroke-width="2.5"/>
+     <circle cx="186" cy="42" r="9"  fill="#e8452c" stroke="#171310" stroke-width="2.5"/>
+     <path d="M-4,122 Q28,56 78,76 Q132,97 162,72 Q202,42 244,68 L244,122 Z" fill="#3aa3dc" stroke="#171310" stroke-width="2.5"/>
+     <path d="M-4,122 Q44,86 96,98 Q160,112 244,90 L244,122 Z" fill="#9fd4ef" stroke="#171310" stroke-width="2.5"/>
+     <circle cx="118" cy="62" r="15" fill="#fffcf2" stroke="#171310" stroke-width="2.5"/>
+     <polygon points="118,55 124,60 122,67 114,67 112,60" fill="#171310"/>
+     <path d="M118,47 v8 M105,58 l7,2 M131,58 l-7,2" stroke="#171310" stroke-width="2" fill="none"/>
+   </svg></div>
+   <div class="logo">WONDER<span>KID</span></div>
+   <div class="tag">A football life · one decision at a time</div>
+   <div class="card">
+    ${hasSave?`<button class="btn gold" onclick="load()&&go()">▶ Continue career</button>`:""}
+    <button class="btn ${hasSave?"alt":""}" onclick="screenCreate()">+ New career</button>
+   </div>`;
+}
+function screenCreate(){
+  const name=pick(FIRST)+" "+pick(LAST);
+  card(`
+    <div class="kicker">Create your player</div>
+    <h2>Who are you?</h2>
+    <input type="text" id="c-name" value="${name}" maxlength="20">
+    <select id="c-country">${COUNTRIES.map(c=>`<option>${c}</option>`).join("")}</select>
+    <div class="kicker" style="margin-top:14px">Position</div>
+    <div class="choice-grid" id="c-pos">${Object.entries(POSITIONS).map(([k,v],i)=>
+      `<div class="chip ${i===0?"sel":""}" data-k="${k}" onclick="selOne(this)"><div class="t">${v.label}</div><div class="d">${v.d}</div></div>`).join("")}</div>
+    <div class="kicker" style="margin-top:14px">Pick 2 traits</div>
+    <div class="choice-grid" id="c-tr">${Object.entries(TRAITS).map(([k,v])=>
+      `<div class="chip" data-k="${k}" onclick="selTwo(this)"><div class="t">${v.t}</div><div class="d">${v.d}</div></div>`).join("")}</div>
+    <button class="btn" style="margin-top:16px" onclick="startCareer()">Begin at the academy →</button>`);
+}
+function selOne(el){ [...el.parentNode.children].forEach(c=>c.classList.remove("sel")); el.classList.add("sel"); }
+function selTwo(el){
+  const sel=[...el.parentNode.querySelectorAll(".sel")];
+  if(el.classList.contains("sel")){el.classList.remove("sel");return;}
+  if(sel.length>=2) sel[0].classList.remove("sel");
+  el.classList.add("sel");
+}
+function startCareer(){
+  const name=$("c-name").value.trim()||"Alex Fletcher";
+  const country=$("c-country").value;
+  const pos=document.querySelector("#c-pos .sel").dataset.k;
+  const traits=[...document.querySelectorAll("#c-tr .sel")].map(e=>e.dataset.k);
+  if(traits.length<2){alert("Pick 2 traits!");return;}
+  wipe(); newGame(name,country,pos,traits);
+  card(`
+    <div class="kicker">Season 1 · Age 16</div>
+    <h2>Welcome to ${S.club.name}.</h2>
+    <p>A cramped dressing room, a pitch that's 60% mud, and a manager who calls everyone "son" because he can't remember names. This is where legends start. Probably.</p>
+    <p style="margin-top:8px">Choose your training focus for this season:</p>
+    ${trainBtns()}`);
+}
+function trainBtns(){
+  const t={tec:"Technique",pac:"Pace",phy:"Physique",men:"Mentality"};
+  return Object.entries(t).map(([k,v])=>`<button class="btn alt" onclick="setTrain('${k}')">${v}<span class="sub">Focus development on ${v.toLowerCase()}</span></button>`).join("");
+}
+function setTrain(k){ S.training=k; save(); go(); }
+
+/* ---------- Main loop ---------- */
+function go(){
+  hud();
+  if(!S){screenStart();return;}
+  if(S.pendingEvent){showEvent(EVENTS.find(e=>e.id===S.pendingEvent));return;}
+  if(S.week>=WEEKS){showSeasonEnd();return;}
+  // chance an event fires before this week's matches
+  if(Math.random()<0.55){
+    const usable=EVENTS.filter(e=>e.cond(S)&&!S.flags["done_"+e.id]);
+    if(usable.length){const ev=pick(usable); S.flags["done_"+ev.id]=true; S.pendingEvent=ev.id; save(); showEvent(ev); return;}
+  }
+  playWeek();
+}
+function showEvent(ev){
+  const body=typeof ev.body==="function"?ev.body(S):ev.body;
+  card(`
+    <div class="kicker">${ev.kicker}</div>
+    <div class="headline">${ev.head}</div>
+    <p>${body}</p>
+    ${ev.choices.map((c,i)=>`<button class="btn ${i>0?"alt":""}" onclick="choose('${ev.id}',${i})">${c.label}${c.sub?`<span class="sub">${c.sub}</span>`:""}</button>`).join("")}`);
+}
+function choose(id,i){
+  const ev=EVENTS.find(e=>e.id===id); const c=ev.choices[i];
+  c.fx(S); S.pendingEvent=null;
+  S.form=clamp(S.form,0,100);S.morale=clamp(S.morale,0,100);S.rep=clamp(S.rep,0,100);
+  save();
+  const out=typeof c.out==="function"?c.out(S):c.out;
+  card(`<div class="kicker">${ev.kicker}</div><p>${out}</p><button class="btn" onclick="playWeek()">Continue →</button>`);
+}
+function playWeek(){
+  const r=simWeek(); S.week++; save();
+  if(r.injured){
+    card(`<div class="kicker">Medical room</div><h2>Sidelined 🤕</h2>
+      <p>You watch from the stands with a coffee and a scarf. The team ${pick(["scrapes by","struggles","wins without you, worryingly","looks lost without you, pleasingly"])}. ${S.injury>0?`Weeks left: ${S.injury+1}.`:"You're back in training next week."}</p>
+      <button class="btn" onclick="go()">Continue →</button>`);
+    return;
+  }
+  const rc=r.avg>=7.5?"var(--gold)":r.avg>=6.5?"#9fd4ef":"#f2a08d";
+  const lines=[];
+  if(r.goals>0)lines.push(`⚽ ${r.goals} goal${r.goals>1?"s":""} this month${S.flags.icon==="celebration"?" — 'The Heron' spotted in the crowd":""}`);
+  if(r.assists>0)lines.push(`🎯 ${r.assists} assist${r.assists>1?"s":""}`);
+  if(r.motm>0)lines.push(`⭐ ${r.motm}× Man of the Match`);
+  if(r.intl)lines.push(`🌍 International duty: +${r.intl.caps} cap${r.intl.goals?", scored for your country!":""}`);
+  if(r.injuredNow)lines.push(`🤕 Picked up a knock — out ${S.injury} week${S.injury>1?"s":""}`);
+  if(r.derby)lines.push(`🔥 Derby week delivered`);
+  if(!lines.length)lines.push(pick(["A quiet month at the office.","Solid if unspectacular.","You ran a lot. The highlights reel is short."]));
+  card(`
+    <div class="kicker">Match block ${S.week}/${WEEKS} · ${r.apps} games</div>
+    <div class="score"><span class="team">${S.club.name}</span><span class="rating-badge" style="background:${rc}">${r.avg.toFixed(1)}</span><span class="team">avg rating</span></div>
+    <div class="events">${lines.map((l,i)=>`<div style="animation-delay:${i*0.25}s">${l}</div>`).join("")}</div>
+    <button class="btn" onclick="go()">Continue →</button>`);
+}
+
+/* ---------- Season end / transfers / retirement ---------- */
+function showSeasonEnd(){
+  const res=seasonEnd(); save();
+  adBreak(()=>{});
+  const rows=`
+    <div class="srow"><span>Appearances</span><b>${res.apps}</b></div>
+    <div class="srow"><span>Goals</span><b>${res.goals}</b></div>
+    <div class="srow"><span>Assists</span><b>${res.assists}</b></div>
+    <div class="srow"><span>Avg rating</span><b>${res.avg.toFixed(2)}</b></div>
+    <div class="srow"><span>League finish</span><b>${ord(res.pos)}${res.pos===1?" 🏆":res.pos<=4?" ✨":""}</b></div>
+    ${res.trophy?`<div class="srow"><span>🏆 Trophy</span><b class="trophy">${res.trophy}</b></div>`:""}
+    ${res.awards.map(a=>`<div class="srow"><span>🎖 Award</span><b class="trophy">${a}</b></div>`).join("")}`;
+  let next="";
+  if(res.offers.length){
+    window._offers=res.offers;
+    next=res.offers.map((o,i)=>`<button class="btn gold" onclick="acceptOffer(${i})">Join ${o.club.name}<span class="sub">${LEAGUES[o.tier].name} · ${fmtM(o.wage*LEAGUES[o.tier].wageMult)}/wk</span></button>`).join("")+
+      `<button class="btn alt" onclick="staySeason()">Stay at ${S.club.name}<span class="sub">Loyalty means something</span></button>`;
+  } else {
+    next=`<button class="btn" onclick="staySeason()">Next season →</button>`;
+  }
+  if(S.age>=33) next+=`<button class="btn alt" onclick="retire()" style="border-color:var(--red)">🏁 Retire<span class="sub">Hang up the boots</span></button>`;
+  card(`<div class="kicker">Season ${S.season} complete · Age ${S.age}</div><h2>Season Review</h2>${rows}${next}`);
+}
+function acceptOffer(i){
+  const o=window._offers[i];
+  S.club=o.club; S.tier=o.tier; S.wage=o.wage; S.role="rotation";
+  S.rep=clamp(S.rep+5,0,100); S.contractYears=3;
+  if(!S.car.clubs.includes(o.club.name))S.car.clubs.push(o.club.name);
+  ageUp();
+  const DEAL_LINES=[
+    s=>`The announcement video features you doing keepy-uppies in the new shirt. Take 14 was the good one.`,
+    s=>`${s.club.name} posts a single mysterious emoji at 9am, then crashes their own website with the reveal at noon.`,
+    s=>`You hold the scarf above your head for two hundred photos. Your arms give out before your grin does.`,
+    s=>`The medical takes four hours. At one point they scan your teeth. Football is a strange industry.`,
+    s=>`Your shirt number was "already promised to the kitman's nephew," so you bought it back with signed boots. Business is business.`,
+    s=>`The club unveils you at half-time. Half the crowd cheers. The other half is in the pie queue. You'll win them over.`
+  ];
+  card(`<div class="kicker">Transfer news</div><h2>DONE DEAL ✍️</h2>
+   <p>"${S.name} completes move to ${S.club.name}" — ${pick(DEAL_LINES)(S)}</p>
+   <p style="margin-top:8px">New league. New teammates who don't pass to you yet. Choose your training focus:</p>${trainBtns()}`);
+}
+function staySeason(){
+  if(S.age>=38||(S.age>=35&&ovr()<62)){forceRetire();return;}
+  ageUp();
+  card(`<div class="kicker">Season ${S.season} · Age ${S.age}</div><h2>Pre-season begins.</h2>
+   <p>${pick(["The fitness coach has invented new ways to make you regret dessert.","A promising kid in the academy is wearing your boots. Your actual boots.","New season, same dream."])}</p>
+   <p style="margin-top:8px">Training focus this season:</p>${trainBtns()}`);
+}
+function forceRetire(){
+  card(`<div class="kicker">The end approaches</div><h2>The legs know.</h2>
+    <p>No offers. Training hurts in new places. The academy kids call you "sir" — not out of respect, out of biology.</p>
+    <button class="btn" onclick="retire()">Announce retirement 🏁</button>`);
+}
+function retire(){
+  const l=legacy(); const c=S.car; const pname=S.name;
+  adBreak(()=>{});
+  const seasons=c.seasons.length;
+  wipe();
+  S=null; hud();
+  const bd=c.ballonDor?`<div class="srow"><span>🏆 Ballon d'Or</span><b class="trophy">×${c.ballonDor}</b></div>`:"";
+  card(`
+    <div class="kicker">Career over · ${seasons} seasons</div>
+    <h2 class="center">${pname} retires.</h2>
+    <div class="grade">${l.grade}</div>
+    <p class="center" style="font-weight:700">${l.title}</p>
+    <div class="big">${l.pts.toLocaleString()} <span style="font-size:16px;color:var(--muted)">legacy pts</span></div>
+    <div style="margin-top:10px">
+      <div class="srow"><span>Appearances</span><b>${c.apps}</b></div>
+      <div class="srow"><span>Goals / Assists</span><b>${c.goals} / ${c.assists}</b></div>
+      <div class="srow"><span>Caps (goals)</span><b>${c.caps} (${c.intGoals})</b></div>
+      <div class="srow"><span>Trophies</span><b>${c.trophies.length}</b></div>
+      <div class="srow"><span>Career earnings</span><b class="money">${fmtM(c.earnings)}</b></div>
+      ${bd}
+    </div>
+    <div style="margin-top:8px">${c.clubs.map(n=>`<span class="pill">${n}</span>`).join("")}</div>
+    <button class="btn gold" style="margin-top:14px" onclick="screenStart()">↺ New career — beat ${l.pts.toLocaleString()} pts</button>`);
+  S=null;
+}
+
+/* ---------------- BOOT ---------------- */
+screenStart();
+</script>
+</body>
+</html>
