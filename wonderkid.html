@@ -695,8 +695,10 @@ function retire(){
   wipe();
   S=null; hud();
   const bd=c.ballonDor?`<div class="srow"><span>🏆 Ballon d'Or</span><b class="trophy">×${c.ballonDor}</b></div>`:"";
-  window._carShare=`Wonderkid: ${pname} retired with ${l.pts.toLocaleString()} legacy pts (${l.grade}) — ${c.goals} goals, ${c.trophies.length} trophies${c.ballonDor?`, ${c.ballonDor}× Ballon d'Or`:""}${(c.wc&&c.wc.titles)?", WORLD CUP WINNER 🌍":""} ⚽ wonderkidgame.com`;
-  const shareBtn=(wasDaily?`<button class="btn" style="background:var(--blue);margin-top:14px" onclick="shareDaily('${wasDaily}',${l.pts},'${l.grade}')">📋 Share today's result</button>`:"")+
+  const grid=emojiGrid(c)+((c.wc&&c.wc.titles)?"🌍".repeat(c.wc.titles):"")+(c.ballonDor?"✨".repeat(c.ballonDor):"");
+  window._carShare=`Wonderkid — ${pname}: ${l.grade} (${l.pts.toLocaleString()} pts)\n${grid}\nwonderkidgame.com`;
+  window._dailyShare=`Wonderkid Daily ${wasDaily} — ${l.pts.toLocaleString()} pts (${l.grade})\n${grid}\nCan you beat me? wonderkidgame.com`;
+  const shareBtn=(wasDaily?`<button class="btn" style="background:var(--blue);margin-top:14px" onclick="shareTxt(window._dailyShare)">📋 Share today's result</button>`:"")+
     `<button class="btn" style="background:var(--blue);margin-top:${wasDaily?"10px":"14px"}" onclick="shareTxt(window._carShare)">📋 Share career</button>`;
   card(`
     <div class="kicker">Career over · ${seasons} seasons</div>
@@ -754,7 +756,13 @@ function startDaily(){
    <p style="margin-top:8px">Everyone in the world gets this exact player today. Same club, same events, same luck — your decisions are the only difference. Score it.</p>
    <p style="margin-top:8px">Training focus:</p>${trainBtns()}`);
 }
+function emojiGrid(c){
+  // one square per season: ⬛ rough, 🟨 solid, 🟩 great, 🏆 champion
+  return c.seasons.map(s=>s.trophy?"🏆":(s.avg>=7.4?"🟩":s.avg>=6.6?"🟨":"⬛")).join("");
+}
 function shareTxt(txt){
+  // native share sheet (like Wordle) where supported; clipboard otherwise
+  if(navigator.share){navigator.share({text:txt}).catch(()=>{});return;}
   const fallback=()=>prompt("Copy your result:",txt);
   if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(()=>alert("Copied — paste it anywhere!"),fallback);
   else fallback();
