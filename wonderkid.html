@@ -186,10 +186,10 @@ const CLUB_NAMES = [
 const T4_INFO={"Real Costa Dorada":"Iberia","Bayern Adler":"Bavaria","AC Fortezza":"Italia","Paris Lumière":"Gallia","Sporting Atlântico":"Lusitania","Ajax Oranje":"the Lowlands","Real Madrigal":"Iberia","Internazionale Azzurro":"Italia","Borussia Westfalen":"Bavaria","Olympique Azur":"Gallia","Benfica Estrela":"Lusitania","Galata Bosphorus":"Anatolia"};
 const COUNTRIES = ["England","Brazil","France","Spain","Germany","Argentina","Nigeria","USA","Japan","Netherlands","Portugal","Croatia"];
 const POSITIONS = {
-  ST:{label:"Striker",     d:"Goals win Ballon d'Ors", goalMult:1.0,  astMult:0.35},
-  W: {label:"Winger",      d:"Flair, pace, highlights", goalMult:0.6, astMult:0.8},
-  AM:{label:"Playmaker",   d:"The one who makes it tick", goalMult:0.45, astMult:1.0},
-  CB:{label:"Defender",    d:"Respected, rarely famous", goalMult:0.12, astMult:0.1},
+  ST:{label:"Striker",     d:"Goals win Ballon d'Ors", goalMult:1.0,  astMult:0.35, x:["Hat-tricks"], xi:["🎩"]},
+  W: {label:"Winger",      d:"Flair, pace, highlights", goalMult:0.6, astMult:0.8,  x:["Dangerous crosses"], xi:["🎪"]},
+  AM:{label:"Playmaker",   d:"The one who makes it tick", goalMult:0.45, astMult:1.0, x:["Decisive passes"], xi:["🎯"]},
+  CB:{label:"Defender",    d:"Respected, rarely famous", goalMult:0.12, astMult:0.1, x:["Clean sheets","Crucial tackles"], xi:["🧤","🛡"]},
 };
 const TRAITS = {
   iron:    {t:"Iron Body",        d:"Half as many injuries"},
@@ -240,7 +240,7 @@ function newGame(name,country,pos,traits,daily){
     fan:50, mgr:55, team:50,
     money:0, wage:180, tier:0, club:null, role:"prospect",
     training:"tec", injury:0, contractYears:2,
-    ssn:{apps:0,goals:0,assists:0,rsum:0,motm:0},
+    ssn:{apps:0,goals:0,assists:0,rsum:0,motm:0,x1:0,x2:0},
     car:{apps:0,goals:0,assists:0,caps:0,intGoals:0,earnings:0,trophies:[],awards:[],clubs:[],ballonDor:0,seasons:[]},
     flags:{}, pendingEvent:null, phase:"week",
     rngState: daily ? ((dailySeed()^0x1F123BB5)|0) : null,
@@ -392,7 +392,7 @@ function simWeek(){
   }
   const minutes={prospect:0.35,rotation:0.6,starter:0.95,star:1}[S.role];
   const apps=Math.round(4*minutes*rnd(0.7,1.05));
-  let goals=0,assists=0,rsum=0,motm=0;
+  let goals=0,assists=0,rsum=0,motm=0,x1=0,x2=0;
   const diff=(ovr()-league.avg)/7.5;
   const p=POSITIONS[S.pos];
   const derby = S.flags.derby; S.flags.derby=false;
@@ -403,13 +403,19 @@ function simWeek(){
     r=clamp(r,3.5,10);
     const gChance=clamp((r-5.4)*0.28*p.goalMult*(S.attrs.tec/70)*(S.traits.includes("finisher")?1.3:1)
       *(S.traits.includes("deadball")?1.25:1)*(S.traits.includes("aerial")?1.8:1),0,0.95);
-    const g=(RNG()<gChance?1:0)+(RNG()<gChance*0.3?1:0);
+    let g=(RNG()<gChance?1:0)+(RNG()<gChance*0.3?1:0);
+    if(S.pos==="ST"&&g===2&&RNG()<0.3){g=3;x1++;} // the match ball is coming home
     const as=RNG()<clamp((r-5.4)*0.25*p.astMult*(S.traits.includes("vision")?1.35:1),0,0.8)?1:0;
+    // position signature stats
+    if(S.pos==="AM")x1+=Math.round(clamp((r-5.6)*1.3,0,4));
+    if(S.pos==="W")x1+=Math.round(clamp((r-5.6)*1.5,0,5));
+    if(S.pos==="CB"){ if(RNG()<clamp((r-5.2)*0.26,0,0.7))x1++; x2+=Math.round(rnd(1,3.9)); }
     goals+=g; assists+=as; r=clamp(r+g*0.7+as*0.4,3.5,10); rsum+=r;
     if(r>=8.3)motm++;
   }
   const avg=apps?rsum/apps:0;
   S.ssn.apps+=apps; S.ssn.goals+=goals; S.ssn.assists+=assists; S.ssn.rsum+=rsum; S.ssn.motm+=motm;
+  S.ssn.x1=(S.ssn.x1||0)+x1; S.ssn.x2=(S.ssn.x2||0)+x2;
   S.form=clamp(S.form+(avg-6.2)*5+(50-S.form)*0.12+((S.fan??50)-50)/60+rnd(-2,2),5,98); // fans singing your name softens the slumps
   S.fitness=clamp(S.fitness-apps*2.2-(S.traits.includes("iron")?0:2)+6,25,100);
   const repCap=[35,55,75,92,100][S.tier]; // small-league heroes aren't global stars
@@ -432,7 +438,7 @@ function simWeek(){
     S.car.caps++; const ig=(S.pos!=="CB"&&RNG()<0.35)?1:0; S.car.intGoals+=ig;
     intl={caps:1,goals:ig};
   }
-  return {apps,goals,assists,avg,motm,injuredNow:S.injury>0&&true,intl,derby};
+  return {apps,goals,assists,avg,motm,x1,x2,injuredNow:S.injury>0&&true,intl,derby};
 }
 
 function seasonEnd(){
@@ -448,6 +454,7 @@ function seasonEnd(){
   // awards
   if(avg>7.3&&S.ssn.goals>=15&&S.pos!=="CB"){res.awards.push("League Top Scorer"); S.rep=clamp(S.rep+5,0,100);}
   if(avg>7.5){res.awards.push("Team of the Season"); S.rep=clamp(S.rep+4,0,100);}
+  if(avg>7.65&&S.ssn.apps>=18){res.awards.push("⭐ League Player of the Season"); S.rep=clamp(S.rep+5,0,100);}
   // Ballon d'Or: the reason to keep playing. World-class season, at the top,
   // in a title race, world-famous — and even then the vote can betray you.
   if(S.tier===4&&S.rep>85&&ovr()>=95&&avg>7.4+S.car.ballonDor*0.15){
@@ -493,6 +500,7 @@ function seasonEnd(){
   }catch(e){}
   S.car.awards.push(...res.awards);
   S.car.apps+=S.ssn.apps; S.car.goals+=S.ssn.goals; S.car.assists+=S.ssn.assists;
+  S.car.x1=(S.car.x1||0)+(S.ssn.x1||0); S.car.x2=(S.car.x2||0)+(S.ssn.x2||0);
   S.car.seasons.push({season:S.season, age:S.age, club:S.club.name, pos:res.pos, trophy:res.trophy||null, awards:res.awards.slice(), ...S.ssn, avg:+avg.toFixed(2)});
   // transfer offers
   if(S.tier<4 && (avg>6.8||S.flags.wantaway) && ovr()>=LEAGUES[S.tier+1].avg-8){
@@ -515,7 +523,7 @@ function ageUp(){
   ["nightout","interview","gaffer","derby","injury_choice","newdeal"].forEach(id=>delete S.flags["done_"+id]);
   if(S.season%2===0)delete S.flags["done_newmanager"]; // managerial merry-go-round spins slower
   S.flags.tabloid=false;
-  S.ssn={apps:0,goals:0,assists:0,rsum:0,motm:0};
+  S.ssn={apps:0,goals:0,assists:0,rsum:0,motm:0,x1:0,x2:0};
   S.fitness=100; S.form=clamp(S.form*0.5+25,20,80);
   if(S.contractYears<=0){S.contractYears=2; S.wage*=1.15;}
   save();
@@ -680,7 +688,10 @@ function playWeek(){
   const rc=r.avg>=7.5?"var(--gold)":r.avg>=6.5?"#9fd4ef":"#f2a08d";
   const lines=[];
   if(r.goals>0)lines.push(`⚽ ${r.goals} goal${r.goals>1?"s":""} this month${S.flags.icon==="celebration"?` — '${(S.flags.celeb||["The Heron"])[0]}' spotted in the crowd`:""}`);
-  if(r.assists>0)lines.push(`🎯 ${r.assists} assist${r.assists>1?"s":""}`);
+  if(r.assists>0)lines.push(`🅰 ${r.assists} assist${r.assists>1?"s":""}`);
+  const XP=POSITIONS[S.pos];
+  if(r.x1>0&&XP.x)lines.push(S.pos==="ST"?`🎩 HAT-TRICK${r.x1>1?" ×"+r.x1:""}! Match ball acquired.`:`${XP.xi[0]} ${r.x1} ${XP.x[0].toLowerCase()}`);
+  if(r.x2>0&&XP.x&&XP.x[1])lines.push(`${XP.xi[1]} ${r.x2} ${XP.x[1].toLowerCase()}`);
   if(r.motm>0)lines.push(`⭐ ${r.motm}× Man of the Match`);
   if(r.intl)lines.push(`🌍 International duty: +${r.intl.caps} cap${r.intl.goals?", scored for your country!":""}`);
   if(r.injuredNow)lines.push(`🤕 Picked up a knock — out ${S.injury} week${S.injury>1?"s":""}`);
@@ -701,6 +712,8 @@ function showSeasonEnd(){
     <div class="srow"><span>Appearances</span><b>${res.apps}</b></div>
     <div class="srow"><span>Goals</span><b>${res.goals}</b></div>
     <div class="srow"><span>Assists</span><b>${res.assists}</b></div>
+    ${res.x1?`<div class="srow"><span>${POSITIONS[S.pos].xi[0]} ${POSITIONS[S.pos].x[0]}</span><b>${res.x1}</b></div>`:""}
+    ${res.x2?`<div class="srow"><span>${POSITIONS[S.pos].xi[1]} ${POSITIONS[S.pos].x[1]}</span><b>${res.x2}</b></div>`:""}
     <div class="srow"><span>Avg rating</span><b>${res.avg.toFixed(2)}</b></div>
     <div class="srow"><span>League finish</span><b>${ord(res.pos)}${res.pos===1?" 🏆":res.pos<=4?" ✨":""}</b></div>
     ${res.cup?`<div class="srow"><span>Domestic cup</span><b>${res.cup}</b></div>`:""}
@@ -789,7 +802,7 @@ function forceRetire(){
     <button class="btn" onclick="retire()">Announce retirement 🏁</button>`);
 }
 function retire(){
-  const l=legacy(); const c=S.car; const pname=S.name; const wasDaily=S.daily;
+  const l=legacy(); const c=S.car; const pname=S.name; const wasDaily=S.daily; const ppos=S.pos;
   adBreak(()=>{});
   const seasons=c.seasons.length;
   try{
@@ -815,6 +828,8 @@ function retire(){
     <div style="margin-top:10px">
       <div class="srow"><span>Appearances</span><b>${c.apps}</b></div>
       <div class="srow"><span>Goals / Assists</span><b>${c.goals} / ${c.assists}</b></div>
+      ${c.x1?`<div class="srow"><span>${POSITIONS[ppos].xi[0]} ${POSITIONS[ppos].x[0]}</span><b>${c.x1}</b></div>`:""}
+      ${c.x2?`<div class="srow"><span>${POSITIONS[ppos].xi[1]} ${POSITIONS[ppos].x[1]}</span><b>${c.x2}</b></div>`:""}
       <div class="srow"><span>Caps (goals)</span><b>${c.caps} (${c.intGoals})</b></div>
       <div class="srow"><span>Trophies</span><b>${c.trophies.length}</b></div>
       <div class="srow"><span>Career earnings</span><b class="money">${fmtM(c.earnings)}</b></div>
@@ -1150,7 +1165,7 @@ function showAchievements(){
   const got=achGot();
   const rows=Object.entries(ACH).map(([k,v])=>{
     const has=got.includes(k);
-    return `<div class="srow" style="${has?"":"opacity:.45"}"><span>${has?"🏅":"🔒"} <b>${v.t}</b><br><span style="font-size:12px;color:var(--muted)">${has?v.d:(k==="goat"||k==="treble"?"???":v.d)}</span></span></div>`;
+    return `<div class="srow" style="${has?"":"opacity:.45"}"><span>${has?"🏅":"🔒"} <b>${v.t}</b><br><span style="font-size:12px;color:var(--muted)">${has?v.d:(k==="underdog"||k==="perfect"||k==="oldgold"?"???":v.d)}</span></span></div>`;
   }).join("");
   const ov=document.createElement("div"); ov.className="overlay";
   ov.onclick=e=>{if(e.target===ov)ov.remove();};
