@@ -4,6 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Wonderkid — A Football Life</title>
+<link rel="icon" type="image/png" href="logo.png">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-NDSWDGZ3Z3"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-NDSWDGZ3Z3');
+</script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;600;700;800&display=swap');
   :root{
@@ -92,6 +101,7 @@
   .poster-art{display:flex; justify-content:center; margin-top:10px;}
   .poster-art svg{width:230px; height:auto;}
   .logo{text-align:center; margin:10px 0 2px; font-family:var(--display); font-size:38px; letter-spacing:-.02em;}
+  .logomark{width:46px; height:46px; border-radius:50%; vertical-align:-9px; margin-right:9px; border:2.5px solid var(--ink);}
   .logo span{color:var(--pink); text-shadow:2px 2px 0 var(--ink);}
   .tag{text-align:center; color:var(--muted); font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.14em; margin-bottom:18px;}
   input[type=text], select{width:100%; background:var(--paper); border:var(--line); color:var(--ink); font-weight:600;
@@ -403,7 +413,9 @@ function seasonEnd(){
   res.pos=clamp(Math.round(10.5-teamScore*1.8+rnd(-2,2)),1,20);
   // Continental Elite: one champion among all of Europe — titles are rare up here
   if(S.tier===4&&res.pos===1&&RNG()<0.92)res.pos=2;
-  if(res.pos===1){ res.trophy=(S.tier===4?"Continental Elite Title":LEAGUES[S.tier].name+" Title"); S.car.trophies.push(res.trophy); S.rep=clamp(S.rep+6,0,100); }
+  if(res.pos===1){ res.trophy=(S.tier===4?"Continental Elite Title":LEAGUES[S.tier].name+" Title"); S.car.trophies.push(res.trophy); S.rep=clamp(S.rep+6,0,100);
+    if(S.tier<4)S.flags.promo=true; // champions go up
+  }
   // awards
   if(avg>7.3&&S.ssn.goals>=15&&S.pos!=="CB"){res.awards.push("League Top Scorer"); S.rep=clamp(S.rep+5,0,100);}
   if(avg>7.5){res.awards.push("Team of the Season"); S.rep=clamp(S.rep+4,0,100);}
@@ -498,7 +510,7 @@ function screenStart(){
      <polygon points="118,55 124,60 122,67 114,67 112,60" fill="#171310"/>
      <path d="M118,47 v8 M105,58 l7,2 M131,58 l-7,2" stroke="#171310" stroke-width="2" fill="none"/>
    </svg></div>
-   <div class="logo">WONDER<span>KID</span></div>
+   <div class="logo"><img src="logo.png" alt="" class="logomark" onerror="this.style.display='none'">WONDER<span>KID</span></div>
    <div class="tag">A football life · one decision at a time</div>
    <div class="card">
     ${hasSave?`<button class="btn gold" onclick="load()&&go()">▶ Continue career</button>`:""}
@@ -624,12 +636,15 @@ function showSeasonEnd(){
     next=`<button class="btn" onclick="staySeason()">Next season →</button>`;
   }
   if(S.age>=33) next+=`<button class="btn alt" onclick="retire()" style="border-color:var(--red)">🏁 Retire<span class="sub">Hang up the boots</span></button>`;
-  card(`<div class="kicker">Season ${S.season} complete · Age ${S.age}</div><h2>Season Review</h2>${rows}${next}`);
+  window._ssnShare=`Wonderkid S${S.season} (age ${S.age}): ${res.goals}⚽ ${res.assists}🅰 · ${res.avg.toFixed(2)} avg · ${ord(res.pos)} with ${S.club.name}${res.trophy?" 🏆":""}${res.awards.length?" 🎖":""} — wonderkidgame.com`;
+  card(`<div class="kicker">Season ${S.season} complete · Age ${S.age}</div><h2>Season Review</h2>${rows}
+    <button class="btn alt" onclick="shareTxt(window._ssnShare)">📋 Share season</button>${next}`);
 }
 function acceptOffer(i){
   const o=window._offers[i];
   S.club=o.club; S.tier=o.tier; S.wage=o.wage; S.role="rotation";
   S.rep=clamp(S.rep+5,0,100); S.contractYears=3;
+  S.flags.bigMove=S.season; S.flags.promo=false; // your old club goes up without you
   if(!S.car.clubs.includes(o.club.name))S.car.clubs.push(o.club.name);
   ageUp();
   const DEAL_LINES=[
@@ -652,13 +667,17 @@ function afterMove(){
 }
 function staySeason(){
   if(S.age>=38||(S.age>=35&&ovr()<62)){forceRetire();return;}
+  if(S.flags.promo&&S.tier<4){S.tier++; S.club.tier=S.tier; S.flags.justPromo=true;} // promoted with your club
+  S.flags.promo=false;
   ageUp();
   if(wcDue()&&wcEligible()){wcIntro();return;}
   if(wcDue()){wcSofa();return;}
   preSeason();
 }
 function preSeason(){
-  card(`<div class="kicker">Season ${S.season} · Age ${S.age}</div><h2>Pre-season begins.</h2>
+  const promo=S.flags.justPromo; S.flags.justPromo=false; save();
+  card(`<div class="kicker">Season ${S.season} · Age ${S.age}</div><h2>${promo?"PROMOTED! 🎉":"Pre-season begins."}</h2>
+   ${promo?`<p><b>${S.club.name} are going up.</b> Welcome to the ${LEAGUES[S.tier].name} — bigger grounds, sharper defenders, better wages. The open-top bus parade lasted four hours.</p>`:""}
    <p>${pick(PRESEASON_LINES)}</p>
    <p style="margin-top:8px">Training focus this season:</p>${trainBtns()}`);
 }
@@ -676,7 +695,9 @@ function retire(){
   wipe();
   S=null; hud();
   const bd=c.ballonDor?`<div class="srow"><span>🏆 Ballon d'Or</span><b class="trophy">×${c.ballonDor}</b></div>`:"";
-  const shareBtn=wasDaily?`<button class="btn" style="background:var(--blue);margin-top:14px" onclick="shareDaily('${wasDaily}',${l.pts},'${l.grade}')">📋 Share today's result</button>`:"";
+  window._carShare=`Wonderkid: ${pname} retired with ${l.pts.toLocaleString()} legacy pts (${l.grade}) — ${c.goals} goals, ${c.trophies.length} trophies${c.ballonDor?`, ${c.ballonDor}× Ballon d'Or`:""}${(c.wc&&c.wc.titles)?", WORLD CUP WINNER 🌍":""} ⚽ wonderkidgame.com`;
+  const shareBtn=(wasDaily?`<button class="btn" style="background:var(--blue);margin-top:14px" onclick="shareDaily('${wasDaily}',${l.pts},'${l.grade}')">📋 Share today's result</button>`:"")+
+    `<button class="btn" style="background:var(--blue);margin-top:${wasDaily?"10px":"14px"}" onclick="shareTxt(window._carShare)">📋 Share career</button>`;
   card(`
     <div class="kicker">Career over · ${seasons} seasons</div>
     <h2 class="center">${pname} retires.</h2>
@@ -733,11 +754,13 @@ function startDaily(){
    <p style="margin-top:8px">Everyone in the world gets this exact player today. Same club, same events, same luck — your decisions are the only difference. Score it.</p>
    <p style="margin-top:8px">Training focus:</p>${trainBtns()}`);
 }
-function shareDaily(day,pts,grade){
-  const txt=`Wonderkid Daily ${day} — ${pts.toLocaleString()} legacy pts (${grade}) ⚽ Can you beat me? wonderkidgame.com`;
+function shareTxt(txt){
   const fallback=()=>prompt("Copy your result:",txt);
-  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(()=>alert("Result copied — paste it anywhere!"),fallback);
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(()=>alert("Copied — paste it anywhere!"),fallback);
   else fallback();
+}
+function shareDaily(day,pts,grade){
+  shareTxt(`Wonderkid Daily ${day} — ${pts.toLocaleString()} legacy pts (${grade}) ⚽ Can you beat me? wonderkidgame.com`);
 }
 
 /* ---------------- CAREER HISTORY ---------------- */
@@ -842,7 +865,9 @@ function wcSummary(){
     ${o.champ?`<div class="srow"><span>🏆</span><b class="trophy">WORLD CUP WINNER</b></div>`:""}
     ${o.gb?`<div class="srow"><span>👟</span><b class="trophy">Golden Boot</b></div>`:""}
     ${o.gball?`<div class="srow"><span>✨</span><b class="trophy">Golden Ball</b></div>`:""}
+    ${o.champ?`<button class="btn" style="background:var(--blue)" onclick="shareTxt(window._wcShare)">📋 Share the glory</button>`:""}
     <button class="btn" onclick="preSeason()">Back to the day job →</button>`);
+  if(o.champ)window._wcShare=`Wonderkid: I just WON THE WORLD CUP with ${S.country} 🌍🏆 ${o.goals} goals${o.gb?" + the Golden Boot 👟":""}${o.gball?" + the Golden Ball ✨":""} — wonderkidgame.com`;
 }
 
 /* ---------------- TEXT VARIETY ---------------- */
