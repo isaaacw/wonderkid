@@ -838,6 +838,7 @@ function retire(){
     <div style="margin-top:8px">${c.clubs.map(n=>`<span class="pill">${n}</span>`).join("")}</div>
     ${shareBtn}
     <button class="btn alt" style="margin-top:${wasDaily?"10px":"14px"}" onclick="showHistory()">📜 Season by season</button>
+    <button class="btn" style="background:#7a5cc7" onclick="managerTeaser('${pname.replace(/'/g,"")}')">🧥 Continue as manager<span class="sub">Take the touchline</span></button>
     <button class="btn gold" onclick="screenStart()">↺ New career — beat ${l.pts.toLocaleString()} pts</button>`);
   S=null;
 }
@@ -1173,6 +1174,16 @@ function showAchievements(){
     <p style="font-size:12.5px;color:var(--muted);font-weight:600;margin-bottom:8px">${achCount()} unlocked · kept across every career</p>
     ${rows}<button class="btn" onclick="this.closest('.overlay').remove()">Close</button></div>`;
   document.body.appendChild(ov);
+}
+
+/* ---------------- MANAGER MODE TEASER (measuring demand via GA) ---------------- */
+function managerTeaser(pname){
+  try{if(typeof gtag==="function")gtag('event','manager_teaser_click');}catch(e){}
+  card(`<div class="kicker">🧥 The next chapter</div>
+    <h2>${pname||"You"} starts the coaching badges.</h2>
+    <p>Fifteen years of dressing rooms, and now a laminated folder full of drills. The tracksuit fits differently when you're the one holding the whistle.</p>
+    <p style="margin-top:8px"><b>Manager Mode is coming soon.</b> Same leagues, same clubs — but this time you pick the team, spend the budget, and get the sack.</p>
+    <button class="btn gold" onclick="screenStart()">↺ Back to the pitch — new career</button>`);
 }
 
 /* ---------------- BOOT ---------------- */
