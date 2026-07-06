@@ -176,6 +176,7 @@ const CLUB_NAMES = [
   ["Albion City","Merchants FC","Crown Park Rangers","Northgate United","Riverhall FC","Grand Union FC","Regent Athletic","Docklands FC","Cathedral City","Kestrel Heath FC"],
   ["Real Costa Dorada","Bayern Adler","AC Fortezza","Paris Lumière","Sporting Atlântico","Ajax Oranje","Real Madrigal","Internazionale Azzurro","Borussia Westfalen","Olympique Azur","Benfica Estrela","Galata Bosphorus"]
 ];
+const T4_INFO={"Real Costa Dorada":"Iberia","Bayern Adler":"Bavaria","AC Fortezza":"Italia","Paris Lumière":"Gallia","Sporting Atlântico":"Lusitania","Ajax Oranje":"the Lowlands","Real Madrigal":"Iberia","Internazionale Azzurro":"Italia","Borussia Westfalen":"Bavaria","Olympique Azur":"Gallia","Benfica Estrela":"Lusitania","Galata Bosphorus":"Anatolia"};
 const COUNTRIES = ["England","Brazil","France","Spain","Germany","Argentina","Nigeria","USA","Japan","Netherlands","Portugal","Croatia"];
 const POSITIONS = {
   ST:{label:"Striker",     d:"Goals win Ballon d'Ors", goalMult:1.0,  astMult:0.35},
@@ -214,6 +215,8 @@ const fmtM=n=>{
   return "£"+Math.round(n);
 };
 const ord=n=>{const s=["th","st","nd","rd"],v=n%100;return n+(s[(v-20)%10]||s[v]||s[0]);};
+// knockout cup: returns rounds won (0..base.length)
+function cupRun(base,perf){let i=0;for(;i<base.length;i++){if(RNG()>=clamp(base[i]+perf,0.05,0.92))break;}return i;}
 
 function potRoll(){
   // Most players top out mid-80s. The 95+ generational rolls are rare;
@@ -324,7 +327,7 @@ const EVENTS = [
    {label:"Rest up", sub:"Miss 2 weeks", fx:s=>{s.injury=2; s.fitness=90;}, out:"Two weeks of pool sessions and daytime TV. Your body says thank you."}
   ]},
  {id:"newdeal", cond:s=>s.contractYears<=1&&s.form>50, kicker:"Contract", head:"The club slides a new contract across the table.",
-  body:s=>`Improved terms: ${fmtM(s.wage*1.6)}/week for 3 years. Your agent thinks you could get more elsewhere.`,
+  body:s=>`Improved terms: ${fmtM(s.wage*1.6*LEAGUES[s.tier].wageMult)}/week for 3 years. Your agent thinks you could get more elsewhere.`,
   choices:[
    {label:"Sign it", sub:"Security + loyalty", fx:s=>{s.wage*=1.6; s.contractYears=3; s.morale+=8;}, out:"The fans sing your name at the next home game. That never gets old."},
    {label:"Hold off", sub:"Bet on a transfer", fx:s=>{s.contractYears=1; s.rep+=2; s.flags.wantaway=true;}, out:"'Contract Standoff' reads the paper. The transfer window will be interesting."}
@@ -439,6 +442,28 @@ function seasonEnd(){
     if(res.pos<=2&&RNG()<0.4){res.awards.push("🏆 BALLON D'OR"); S.car.ballonDor++; S.rep=100;}
     else res.awards.push("Ballon d'Or: 2nd in the vote. Robbed.");
   }
+  // domestic cup (top two levels)
+  if(S.tier>=3){
+    const perf=(avg-6.5)*0.08;
+    const dc=cupRun([0.62,0.55,0.5,0.45,0.42],perf);
+    res.cup=["R32","R16","QF","SF","Final — lost","WINNERS 🏆"][dc];
+    if(dc===5){const t=(S.tier===4?"Elite Cup":"Albion Cup"); S.car.trophies.push(t); S.rep=clamp(S.rep+4,0,100);}
+  }
+  // European Cup: the hardest prize in club football
+  if(S.tier===4||(S.tier===3&&S.flags.euroSpot)){
+    const perf=(avg-6.5)*0.08;
+    const ec=cupRun([0.58,0.40,0.36,0.32,0.28],perf);
+    res.euro=["Group stage","R16","QF","SF","Final — lost","CHAMPIONS 🏆🏆"][ec];
+    if(ec===5){S.car.trophies.push("🏆 EUROPEAN CUP"); S.car.awards.push("European Champion"); S.rep=clamp(S.rep+10,0,100);}
+    else if(ec>=3)S.rep=clamp(S.rep+3,0,100);
+  }
+  S.flags.euroSpot=(S.tier===3&&res.pos<=4);
+  // Ballon d'Or world ranking (elite players only)
+  if(S.tier===4&&ovr()>=90&&S.rep>=70){
+    const score=(ovr()-88)*3+(avg-6.5)*6+(res.trophy?4:0);
+    res.bdoRank=res.awards.includes("🏆 BALLON D'OR")?1:(res.awards.some(a=>a.indexOf("2nd in the vote")>=0)?2:clamp(Math.round(50-score+rnd(-3,3)),3,50));
+  }
+  S.lastPos=res.pos;
   S.car.awards.push(...res.awards);
   S.car.apps+=S.ssn.apps; S.car.goals+=S.ssn.goals; S.car.assists+=S.ssn.assists;
   S.car.seasons.push({season:S.season, age:S.age, club:S.club.name, pos:res.pos, trophy:res.trophy||null, awards:res.awards.slice(), ...S.ssn, avg:+avg.toFixed(2)});
@@ -460,7 +485,8 @@ function seasonEnd(){
 function ageUp(){
   S.age++; S.season++; S.week=0;
   // repeatable events can fire again next season
-  ["nightout","interview","gaffer","derby","injury_choice","newdeal","newmanager"].forEach(id=>delete S.flags["done_"+id]);
+  ["nightout","interview","gaffer","derby","injury_choice","newdeal"].forEach(id=>delete S.flags["done_"+id]);
+  if(S.season%2===0)delete S.flags["done_newmanager"]; // managerial merry-go-round spins slower
   S.flags.tabloid=false;
   S.ssn={apps:0,goals:0,assists:0,rsum:0,motm:0};
   S.fitness=100; S.form=clamp(S.form*0.5+25,20,80);
@@ -643,12 +669,15 @@ function showSeasonEnd(){
     <div class="srow"><span>Assists</span><b>${res.assists}</b></div>
     <div class="srow"><span>Avg rating</span><b>${res.avg.toFixed(2)}</b></div>
     <div class="srow"><span>League finish</span><b>${ord(res.pos)}${res.pos===1?" 🏆":res.pos<=4?" ✨":""}</b></div>
+    ${res.cup?`<div class="srow"><span>Domestic cup</span><b>${res.cup}</b></div>`:""}
+    ${res.euro?`<div class="srow"><span>European Cup</span><b>${res.euro}</b></div>`:""}
+    ${res.bdoRank?`<div class="srow"><span>Ballon d'Or ranking</span><b>#${res.bdoRank} in the world</b></div>`:""}
     ${res.trophy?`<div class="srow"><span>🏆 Trophy</span><b class="trophy">${res.trophy}</b></div>`:""}
     ${res.awards.map(a=>`<div class="srow"><span>🎖 Award</span><b class="trophy">${a}</b></div>`).join("")}`;
   let next="";
   if(res.offers.length){
     window._offers=res.offers;
-    next=res.offers.map((o,i)=>`<button class="btn gold" onclick="acceptOffer(${i})">Join ${o.club.name}<span class="sub">${LEAGUES[o.tier].name} · ${fmtM(o.wage*LEAGUES[o.tier].wageMult)}/wk</span></button>`).join("")+
+    next=res.offers.map((o,i)=>`<button class="btn gold" onclick="acceptOffer(${i})">Join ${o.club.name}<span class="sub">${LEAGUES[o.tier].name} · ${fmtM(o.wage*LEAGUES[o.tier].wageMult)}/wk${o.tier===4?` · ${T4_INFO[o.club.name]||"Europe"} · ${o.club.str>=87?"continental giants":o.club.str>=84?"title contenders":"European regulars"}`:""}</span></button>`).join("")+
       `<button class="btn alt" onclick="staySeason()">Stay at ${S.club.name}<span class="sub">Loyalty means something</span></button>`;
   } else {
     next=`<button class="btn" onclick="staySeason()">Next season →</button>`;
@@ -658,8 +687,17 @@ function showSeasonEnd(){
   card(`<div class="kicker">Season ${S.season} complete · Age ${S.age}</div><h2>Season Review</h2>${rows}
     <button class="btn alt" onclick="shareTxt(window._ssnShare)">📋 Share season</button>${next}`);
 }
+function transferFee(){
+  const o=ovr();
+  let fee=400000*Math.pow(1.18,o-60);
+  fee*= S.age<=21?1.6: S.age<=24?1.35: S.age<=27?1.1: S.age<=30?0.6: 0.3;
+  fee*= 1+(S.rep/250);
+  return Math.min(Math.max(Math.round(fee/100000)*100000,50000),200000000);
+}
 function acceptOffer(i){
   const o=window._offers[i];
+  const fee=transferFee();
+  window._lastFee=fee;
   S.club=o.club; S.tier=o.tier; S.wage=o.wage; S.role="rotation";
   S.rep=clamp(S.rep+5,0,100); S.contractYears=3;
   S.flags.bigMove=S.season; S.flags.promo=false; // your old club goes up without you
@@ -675,6 +713,8 @@ function acceptOffer(i){
   ];
   card(`<div class="kicker">Transfer news</div><h2>DONE DEAL ✍️</h2>
    <p>"${S.name} completes move to ${S.club.name}" — ${pick(DEAL_LINES)(S)}</p>
+   <div class="srow" style="margin-top:8px"><span>Transfer fee</span><b class="money">${fmtM(window._lastFee)}</b></div>
+   <p style="margin-top:8px">${window._lastFee>=100000000?"A world-record package. Absolutely no pressure then.":window._lastFee>=30000000?"Big money. The fans will expect goals and miracles, in that order.":"A tidy bit of business. Time to make it look like a bargain."}</p>
    <p style="margin-top:8px">New league. New teammates who don't pass to you yet.</p>
    <button class="btn" onclick="afterMove()">Continue →</button>`);
 }
@@ -713,9 +753,8 @@ function retire(){
   wipe();
   S=null; hud();
   const bd=c.ballonDor?`<div class="srow"><span>🏆 Ballon d'Or</span><b class="trophy">×${c.ballonDor}</b></div>`:"";
-  const grid=emojiGrid(c)+((c.wc&&c.wc.titles)?"🌍".repeat(c.wc.titles):"")+(c.ballonDor?"✨".repeat(c.ballonDor):"");
-  window._carShare=`Wonderkid — ${pname}: ${l.grade} (${l.pts.toLocaleString()} pts)\n${grid}\nwonderkidgame.com`;
-  window._dailyShare=`Wonderkid Daily ${wasDaily} — ${l.pts.toLocaleString()} pts (${l.grade})\n${grid}\nCan you beat me? wonderkidgame.com`;
+  window._carShare=`Wonderkid — ${pname}: ${l.grade} (${l.pts.toLocaleString()} legacy pts) · ${c.goals} goals · ${c.trophies.length} trophies${c.ballonDor?` · ${c.ballonDor}× Ballon d'Or`:""}${(c.wc&&c.wc.titles)?" · WORLD CUP WINNER 🌍":""} ⚽ wonderkidgame.com`;
+  window._dailyShare=`Wonderkid Daily ${wasDaily} — ${l.pts.toLocaleString()} legacy pts (${l.grade}). Can you beat me? ⚽ wonderkidgame.com`;
   const shareBtn=(wasDaily?`<button class="btn" style="background:var(--blue);margin-top:14px" onclick="shareTxt(window._dailyShare)">📋 Share today's result</button>`:"")+
     `<button class="btn" style="background:var(--blue);margin-top:${wasDaily?"10px":"14px"}" onclick="shareTxt(window._carShare)">📋 Share career</button>`;
   card(`
@@ -976,7 +1015,7 @@ EVENTS.push(
    {label:"Appeal the red", sub:"Fight it publicly", fx:s=>{s.flags.refbeef=true; if(RNG()<0.55){s.rep+=4; s.morale+=6;}else{s.injury=1; s.morale-=4;}}, out:s=>s.injury>0?"Appeal rejected — one match ban, plus a fine for the interview you gave about it. Worth it? Slightly.":"Red card rescinded. You post a single raised-eyebrow emoji. 300k likes."},
    {label:"Take the ban quietly", sub:"Miss a week", fx:s=>{s.flags.refbeef=true; s.injury=1; s.attrs.men+=2;}, out:"You serve the ban, say nothing, and come back angry in the useful way."}
   ]},
- {id:"newmanager", cond:s=>s.season>=3&&s.rep>=25, kicker:"Upheaval", head:"The manager's gone. The new one 'has his own ideas.'",
+ {id:"newmanager", cond:s=>s.season>=3&&s.rep>=25&&RNG()<0.25, kicker:"Upheaval", head:"The manager's gone. The new one 'has his own ideas.'",
   body:["First session: cones everywhere. He hasn't said your name yet.","He introduces himself with a 45-slide presentation titled 'THE SYSTEM'.","Word is he doesn't rate anyone under six foot. You measure yourself twice.","His first act: banning ketchup. His second: extra running. The mood is tense."],
   choices:[
    {label:"Impress him immediately", sub:"+form, -fitness", fx:s=>{s.form+=10; s.fitness-=8;}, out:"You sprint everything for two weeks, including the walk to lunch. He finally nods at you. A NOD."},
