@@ -184,13 +184,21 @@ const POSITIONS = {
   CB:{label:"Defender",    d:"Respected, rarely famous", goalMult:0.12, astMult:0.1},
 };
 const TRAITS = {
-  finisher:{t:"Natural Finisher", d:"+ goals per chance"},
-  rocket:  {t:"Rocket Pace",      d:"Faster development of pace-based play"},
   iron:    {t:"Iron Body",        d:"Half as many injuries"},
   media:   {t:"Media Darling",    d:"Reputation grows faster"},
   late:    {t:"Late Bloomer",     d:"Keep improving until 30"},
   captain: {t:"Born Leader",      d:"Morale dips hurt less, captaincy sooner"},
+  finisher:{t:"Natural Finisher", d:"+ goals per chance"},
+  clutch:  {t:"Big-Game Player",  d:"Rises to derbies, finals, World Cups"},
+  rocket:  {t:"Rocket Pace",      d:"Blistering speed from day one"},
+  showman: {t:"Crowd Pleaser",    d:"Flair play earns extra fame"},
+  vision:  {t:"Eyes in the Back", d:"Sees passes others don't (+assists)"},
+  deadball:{t:"Set-Piece Wizard", d:"Free kicks and corners are yours"},
+  wall:    {t:"The Wall",         d:"Steadier ratings at the back"},
+  aerial:  {t:"Aerial Threat",    d:"A menace at corners (+goals)"},
 };
+const SHARED_TRAITS=["iron","media","late","captain"];
+const TRAIT_POOL={ST:["finisher","clutch"],W:["rocket","showman"],AM:["vision","deadball"],CB:["wall","aerial"]};
 const FIRST=["Alex","Marco","Kai","Leo","Sam","Diego","Yusuf","Tom","Andrés","Jude","Nico","Erik"];
 const LAST=["Fletcher","Moreau","Santos","Vance","Okafor","Kimura","Berg","Iversen","Romero","Whitlock","Duval","Keane"];
 
@@ -230,7 +238,7 @@ function newGame(name,country,pos,traits,daily){
   if(daily){ // everyone on Earth gets this exact prospect today
     S.name=pick(FIRST)+" "+pick(LAST); S.country=pick(COUNTRIES);
     S.pos=pick(["ST","W","AM","CB"]);
-    const tk=Object.keys(TRAITS); S.traits=[];
+    const tk=TRAIT_POOL[S.pos].concat(SHARED_TRAITS); S.traits=[];
     while(S.traits.length<2){const t=pick(tk); if(!S.traits.includes(t))S.traits.push(t);}
   }
   S.attrs={tec: ri(40,48), pac: ri(40,48), phy: ri(33,41), men: ri(33,41)};
@@ -238,6 +246,10 @@ function newGame(name,country,pos,traits,daily){
   S.club=makeClub(0); S.car.clubs=[S.club.name];
   if(S.traits.includes("rocket")) S.attrs.pac+=6;
   if(S.traits.includes("finisher")) S.attrs.tec+=4;
+  if(S.traits.includes("wall")) {S.attrs.phy+=3; S.attrs.men+=2;}
+  if(S.traits.includes("vision")||S.traits.includes("deadball")||S.traits.includes("showman")) S.attrs.tec+=3;
+  if(S.traits.includes("aerial")) S.attrs.phy+=3;
+  if(S.traits.includes("clutch")) S.attrs.men+=3;
   save();
 }
 function makeClub(tier){
@@ -374,11 +386,13 @@ function simWeek(){
   const p=POSITIONS[S.pos];
   const derby = S.flags.derby; S.flags.derby=false;
   for(let i=0;i<apps;i++){
-    let r=6.1+diff+(S.form-50)/55+(S.fitness-70)/100+rnd(-1.1,1.1)+(derby&&i===0?0.8:0);
+    let r=6.1+diff+(S.form-50)/55+(S.fitness-70)/100+rnd(-1.1,1.1)+(derby&&i===0?0.8:0)
+      +(S.traits.includes("wall")?0.15:0)+(derby&&i===0&&S.traits.includes("clutch")?0.5:0);
     r=clamp(r,3.5,10);
-    const gChance=clamp((r-5.4)*0.28*p.goalMult*(S.attrs.tec/70)*(S.traits.includes("finisher")?1.3:1),0,0.95);
+    const gChance=clamp((r-5.4)*0.28*p.goalMult*(S.attrs.tec/70)*(S.traits.includes("finisher")?1.3:1)
+      *(S.traits.includes("deadball")?1.25:1)*(S.traits.includes("aerial")?1.8:1),0,0.95);
     const g=(RNG()<gChance?1:0)+(RNG()<gChance*0.3?1:0);
-    const as=RNG()<clamp((r-5.4)*0.25*p.astMult,0,0.8)?1:0;
+    const as=RNG()<clamp((r-5.4)*0.25*p.astMult*(S.traits.includes("vision")?1.35:1),0,0.8)?1:0;
     goals+=g; assists+=as; r=clamp(r+g*0.7+as*0.4,3.5,10); rsum+=r;
     if(r>=8.3)motm++;
   }
@@ -387,7 +401,7 @@ function simWeek(){
   S.form=clamp(S.form+(avg-6.2)*5+(50-S.form)*0.12+rnd(-2,2),5,98);
   S.fitness=clamp(S.fitness-apps*2.2-(S.traits.includes("iron")?0:2)+6,25,100);
   const repCap=[35,55,75,92,100][S.tier]; // small-league heroes aren't global stars
-  S.rep=clamp(S.rep+(avg>7?(S.traits.includes("media")?1.6:1):(avg>6.2?0.4:-0.3))+goals*0.25*(S.tier*0.4+0.4)+(S.flags.icon==="celebration"?goals*0.15:0),0,repCap);
+  S.rep=clamp(S.rep+(avg>7?(S.traits.includes("media")?1.6:1):(avg>6.2?0.4:-0.3))+goals*0.25*(S.tier*0.4+0.4)+(S.flags.icon==="celebration"?goals*0.15:0)+(S.traits.includes("showman")?assists*0.3:0),0,repCap);
   // injury chance
   if(RNG()<(S.fitness<45?0.16:0.05)*(S.traits.includes("iron")?0.45:1)){ S.injury=ri(1,3); }
   // promotion of role
@@ -527,13 +541,17 @@ function screenCreate(){
     <select id="c-country">${COUNTRIES.map(c=>`<option>${c}</option>`).join("")}</select>
     <div class="kicker" style="margin-top:14px">Position</div>
     <div class="choice-grid" id="c-pos">${Object.entries(POSITIONS).map(([k,v],i)=>
-      `<div class="chip ${i===0?"sel":""}" data-k="${k}" onclick="selOne(this)"><div class="t">${v.label}</div><div class="d">${v.d}</div></div>`).join("")}</div>
+      `<div class="chip ${i===0?"sel":""}" data-k="${k}" onclick="selPos(this)"><div class="t">${v.label}</div><div class="d">${v.d}</div></div>`).join("")}</div>
     <div class="kicker" style="margin-top:14px">Pick 2 traits</div>
-    <div class="choice-grid" id="c-tr">${Object.entries(TRAITS).map(([k,v])=>
-      `<div class="chip" data-k="${k}" onclick="selTwo(this)"><div class="t">${v.t}</div><div class="d">${v.d}</div></div>`).join("")}</div>
+    <div class="choice-grid" id="c-tr">${traitChips("ST")}</div>
     <button class="btn" style="margin-top:16px" onclick="startCareer()">Begin at the academy →</button>`);
 }
 function selOne(el){ [...el.parentNode.children].forEach(c=>c.classList.remove("sel")); el.classList.add("sel"); }
+function traitChips(pos){
+  return TRAIT_POOL[pos].concat(SHARED_TRAITS).map(k=>{const v=TRAITS[k];
+    return `<div class="chip" data-k="${k}" onclick="selTwo(this)"><div class="t">${v.t}</div><div class="d">${v.d}</div></div>`;}).join("");
+}
+function selPos(el){ selOne(el); const tr=document.getElementById("c-tr"); if(tr)tr.innerHTML=traitChips(el.dataset.k); }
 function selTwo(el){
   const sel=[...el.parentNode.querySelectorAll(".sel")];
   if(el.classList.contains("sel")){el.classList.remove("sel");return;}
@@ -798,7 +816,7 @@ function wcEligible(){return S.flags.capped||S.rep>=40;}
 function wcStart(){S.flags.capped=true; S.wc={n:0,wins:0,out:false,champ:false,goals:0,rsum:0,used:[]}; save();}
 function wcPlayMatch(){
   const w=S.wc; const idx=w.n;
-  let r=clamp(6.1+(ovr()-80)/7.5+(S.form-50)/60+rnd(-1.1,1.1),3.5,10);
+  let r=clamp(6.1+(ovr()-80)/7.5+(S.form-50)/60+rnd(-1.1,1.1)+(S.traits.includes("clutch")?0.3:0),3.5,10);
   const p=POSITIONS[S.pos];
   let g=(RNG()<clamp((r-5.4)*0.25*p.goalMult*(S.attrs.tec/70),0,0.9)?1:0);
   if(g&&RNG()<0.25*p.goalMult)g++;
