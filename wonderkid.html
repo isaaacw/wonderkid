@@ -144,6 +144,8 @@
   <div id="seasonbar">
     <div class="lbl"><span id="sb-label"></span><span id="sb-week"></span></div>
     <div class="track"><div class="fill" id="sb-fill" style="width:0%"></div></div>
+    <div class="lbl" style="margin-top:7px"><span>Career</span><span id="cb-phase"></span></div>
+    <div class="track"><div class="fill" id="cb-fill" style="width:0%; background:repeating-linear-gradient(45deg,var(--pink) 0 10px,var(--orange) 10px 20px);"></div></div>
   </div>
 </div>
 <script>
@@ -426,10 +428,9 @@ function seasonEnd(){
   const avg=S.ssn.apps?S.ssn.rsum/S.ssn.apps:0;
   const res={avg, ...S.ssn, awards:[], trophy:null, offers:[]};
   // league outcome
-  const teamScore=(avg-6.3)*3 + rnd(-5,5);
+  const clubEdge=S.club.str-LEAGUES[S.tier].avg; // giants dominate their league
+  const teamScore=(avg-6.3)*3 + clubEdge*0.7 + rnd(-5,5);
   res.pos=clamp(Math.round(10.5-teamScore*1.8+rnd(-2,2)),1,20);
-  // Continental Elite: one champion among all of Europe — titles are rare up here
-  if(S.tier===4&&res.pos===1&&RNG()<0.92)res.pos=2;
   if(res.pos===1){ res.trophy=(S.tier===4?"Continental Elite Title":LEAGUES[S.tier].name+" Title"); S.car.trophies.push(res.trophy); S.rep=clamp(S.rep+6,0,100);
     if(S.tier<4)S.flags.promo=true; // champions go up
   }
@@ -444,14 +445,14 @@ function seasonEnd(){
   }
   // domestic cup (top two levels)
   if(S.tier>=3){
-    const perf=(avg-6.5)*0.08;
+    const perf=(avg-6.5)*0.08+(S.club.str-LEAGUES[S.tier].avg)*0.02;
     const dc=cupRun([0.62,0.55,0.5,0.45,0.42],perf);
     res.cup=["R32","R16","QF","SF","Final — lost","WINNERS 🏆"][dc];
     if(dc===5){const t=(S.tier===4?"Elite Cup":"Albion Cup"); S.car.trophies.push(t); S.rep=clamp(S.rep+4,0,100);}
   }
   // European Cup: the hardest prize in club football
   if(S.tier===4||(S.tier===3&&S.flags.euroSpot)){
-    const perf=(avg-6.5)*0.08;
+    const perf=(avg-6.5)*0.08+(S.club.str-LEAGUES[S.tier].avg)*0.015;
     const ec=cupRun([0.58,0.40,0.36,0.32,0.28],perf);
     res.euro=["Group stage","R16","QF","SF","Final — lost","CHAMPIONS 🏆🏆"][ec];
     if(ec===5){S.car.trophies.push("🏆 EUROPEAN CUP"); S.car.awards.push("European Champion"); S.rep=clamp(S.rep+10,0,100);}
@@ -519,7 +520,7 @@ function hud(){
   const bar=(l,v,c)=>`<div class="mini"><div class="lbl"><span>${l}</span><span>${Math.round(v)}</span></div><div class="track"><div class="fill" style="width:${v}%;background:${c}"></div></div></div>`;
   h.innerHTML=`
     <div class="row1"><span class="pname">${S.name} <span style="color:var(--muted);font-weight:600;font-size:12px">${POSITIONS[S.pos].label} · ${S.age}y</span></span><span class="ovr">${ovr()}</span></div>
-    <div class="row2"><span>${S.club.name} · ${LEAGUES[S.tier].name}</span><span class="money">${fmtM(S.money)}</span></div>
+    <div class="row2"><span>${S.club.name} · ${LEAGUES[S.tier].name}</span><span class="money" title="Your personal savings">💰 Bank: ${fmtM(S.money)}</span></div>
     <div class="bars">${bar("Form",S.form,"var(--green)")}${bar("Fitness",S.fitness,"var(--blue)")}${bar("Morale",S.morale,"#e67e22")}${bar("Fame",S.rep,"var(--gold)")}</div>
     <div class="attrs">
       <span>TEC <b>${Math.round(S.attrs.tec)}</b></span><span>PAC <b>${Math.round(S.attrs.pac)}</b></span>
@@ -531,6 +532,9 @@ function hud(){
   $("sb-label").textContent=`Season ${S.season} · ${S.club.name}`;
   $("sb-week").textContent=S.week>=WEEKS?"Season complete":`Match block ${S.week+1}/${WEEKS}`;
   $("sb-fill").style.width=(S.week/WEEKS*100)+"%";
+  // career arc: roughly age 16 → 38
+  $("cb-fill").style.width=clamp(((S.age-16)+S.week/WEEKS)/22*100,2,100)+"%";
+  $("cb-phase").textContent=(S.age<19?"Prospect":S.age<24?"Breakthrough":S.age<30?"PRIME":S.age<34?"Veteran":"Twilight")+" · age "+S.age;
 }
 function card(html){ stage.innerHTML=`<div class="card">${html}</div>`; hud(); }
 
@@ -554,7 +558,7 @@ function screenStart(){
    <div class="tag">A football life · one decision at a time</div>
    <div class="card">
     ${hasSave?`<button class="btn gold" onclick="load()&&go()">▶ Continue career</button>`:""}
-    <button class="btn ${hasSave?"alt":""}" onclick="screenCreate()">+ New career</button>
+    <button class="btn ${hasSave?"alt":""}" onclick="screenCreate()">+ New career<span class="sub">A full career takes ~15–20 minutes · auto-saves as you go</span></button>
     <button class="btn alt" onclick="startDaily()">📅 Daily Challenge<span class="sub">${dailyBestText()}</span></button>
    </div>`;
 }
