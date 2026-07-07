@@ -197,7 +197,7 @@ const T4_INFO={"Real Costa Dorada":"Iberia","Bayern Adler":"Bavaria","AC Fortezz
 const COUNTRIES = ["England","Brazil","France","Spain","Germany","Argentina","Nigeria","USA","Japan","Netherlands","Portugal","Croatia"];
 const POSITIONS = {
   ST:{label:"Striker",     d:"Goals win Ballon d'Ors", goalMult:1.0,  astMult:0.35, x:["Hat-tricks"], xi:["🎩"]},
-  W: {label:"Winger",      d:"Flair, pace, highlights", goalMult:0.6, astMult:0.8,  x:["Dangerous crosses"], xi:["🎪"]},
+  W: {label:"Winger",      d:"Flair, pace, highlights", goalMult:0.6, astMult:0.8,  x:["Dangerous crosses"], xi:["🌀"]},
   AM:{label:"Playmaker",   d:"The one who makes it tick", goalMult:0.45, astMult:1.0, x:["Decisive passes"], xi:["🎯"]},
   CB:{label:"Defender",    d:"Respected, rarely famous", goalMult:0.12, astMult:0.1, x:["Clean sheets","Crucial tackles"], xi:["🧤","🛡"]},
 };
@@ -239,7 +239,7 @@ function potRoll(){
   // Most players top out mid-80s. The 95+ generational rolls are rare;
   // a perfect 100 is once-in-a-generation.
   const r=RNG();
-  return Math.round(82+5*r+13*Math.pow(r,5));
+  return Math.min(100,Math.round(81+8*r+13*Math.pow(r,5)));
 }
 function newGame(name,country,pos,traits,daily,av){
   S = {
@@ -265,6 +265,7 @@ function newGame(name,country,pos,traits,daily,av){
   S.av=av||{s:ri(0,4),h:ri(0,4),k:ri(0,4)}; // daily rolls are seeded = same face worldwide
   S.attrs={tec: ri(40,48), pac: ri(40,48), phy: ri(33,41), men: ri(33,41)};
   S.pot=potRoll();
+  S.capJit={tec:ri(-2,1),pac:ri(-2,1),phy:ri(-3,0),men:ri(-2,1)}; // stats plateau at varied heights, not one flat number
   S.club=makeClub(0); S.car.clubs=[S.club.name];
   if(S.traits.includes("rocket")) S.attrs.pac+=6;
   if(S.traits.includes("finisher")) S.attrs.tec+=4;
@@ -372,7 +373,7 @@ const EVENTS = [
 ];
 
 /* ---------------- ENGINE ---------------- */
-const WEEKS = 9; // match blocks per season (each ≈ 4 matches)
+const WEEKS = 8; // match blocks per season (each ≈ 4 matches)
 
 function trainingGain(){
   const a=S.attrs;
@@ -389,7 +390,7 @@ function trainingGain(){
   const cap=Math.min(S.pot+Math.round(S.tier/2),100); // elite environment nudges your ceiling
   let g = growth*roleMin*rnd(0.7,1.4)*(1+S.tier*0.08); // better league = better coaching
   // every point is harder to earn than the last
-  const bump=(k,amt)=>{const hard=clamp((100-a[k])/34,0.05,1); a[k]=clamp(a[k]+amt*hard,20,cap);};
+  const bump=(k,amt)=>{const hard=clamp((100-a[k])/34,0.05,1); const capK=clamp(cap+((S.capJit&&S.capJit[k])||0),20,100); a[k]=clamp(a[k]+amt*hard,20,capK);};
   bump(S.training, g);
   bump(pick(["tec","pac","phy","men"]), g*0.4);
 }
@@ -467,7 +468,7 @@ function seasonEnd(){
   }
   if(res.pos>=18&&S.tier>0)S.flags.releg=true; // bottom three go down
   // awards
-  if(avg>7.3&&S.ssn.goals>=16&&S.pos!=="CB"){res.awards.push("League Top Scorer"); S.rep=clamp(S.rep+5,0,100);}
+  if(avg>7.3&&S.ssn.goals>=15&&S.pos!=="CB"){res.awards.push("League Top Scorer"); S.rep=clamp(S.rep+5,0,100);}
   if(avg>7.5){res.awards.push("Team of the Season"); S.rep=clamp(S.rep+4,0,100);}
   if(avg>7.7&&S.ssn.apps>=18){res.awards.push("⭐ League Player of the Season"); S.rep=clamp(S.rep+5,0,100);}
   // (Ballon d'Or vote happens after the cups are decided — see below)
@@ -572,8 +573,12 @@ function hud(){
   if(!S){h.style.display="none";$("seasonbar").style.display="none";return;}
   h.style.display="block";
   const bar=(l,v,c)=>`<div class="mini"><div class="lbl"><span>${l}</span><span>${Math.round(v)}</span></div><div class="track"><div class="fill" style="width:${v}%;background:${c}"></div></div></div>`;
-  h.innerHTML=`
-    <div class="row1"><span class="pname">${svgAvatar(S.av,32)} ${S.name} <span style="color:var(--muted);font-weight:600;font-size:12px">${POSITIONS[S.pos].label} · ${S.age}y</span></span><span class="ovr">${ovr()}</span></div>
+  // avatar lives in a stable node so it never re-renders (no blink between weeks)
+  if(!document.getElementById("hud-av")){h.innerHTML=`<div style="display:flex;gap:10px;align-items:flex-start"><div id="hud-av" style="flex:none;padding-top:2px"></div><div id="hud-body" style="flex:1;min-width:0"></div></div>`;}
+  const avEl=document.getElementById("hud-av"), avKey=JSON.stringify(S.av||0);
+  if(avEl.dataset.k!==avKey){avEl.dataset.k=avKey; avEl.innerHTML=svgAvatar(S.av,46);}
+  document.getElementById("hud-body").innerHTML=`
+    <div class="row1"><span class="pname">${S.name} <span style="color:var(--muted);font-weight:600;font-size:12px">${POSITIONS[S.pos].label} · ${S.age}y</span></span><span class="ovr">${ovr()}</span></div>
     <div class="row2"><span>${S.club.name} · ${LEAGUES[S.tier].name}</span><span class="money" title="Your personal savings">💰 Bank: ${fmtM(S.money)}</span></div>
     <div class="bars">${bar("Form",S.form,"var(--green)")}${bar("Fitness",S.fitness,"var(--blue)")}${bar("Morale",S.morale,"#e67e22")}${bar("Fame",S.rep,"var(--gold)")}</div>
     <div class="bars" style="margin-top:6px">${bar("Fans",S.fan??50,"var(--pink)")}${bar("Gaffer",S.mgr??55,"#7a5cc7")}${bar("Squad",S.team??50,"var(--orange)")}</div>
@@ -843,7 +848,8 @@ function retire(){
     if(l.grade==="GOAT")ach("goat");
   }catch(e){}
   if(wasDaily){try{const k="wk_daily_"+wasDaily; if(l.pts>(+localStorage.getItem(k)||0))localStorage.setItem(k,l.pts);}catch(e){}}
-  hofSave({n:pname,grade:l.grade,pts:l.pts,goals:c.goals,troph:c.trophies.length,bdo:c.ballonDor||0,wc:(c.wc&&c.wc.titles)||0,peak:c.peak||0,seasons,av:pav,natCap:!!c.natCap});
+  const hofEntry={n:pname,grade:l.grade,pts:l.pts,goals:c.goals,troph:c.trophies.length,bdo:c.ballonDor||0,wc:(c.wc&&c.wc.titles)||0,peak:c.peak||0,seasons,av:pav,natCap:!!c.natCap};
+  if(wasDaily){window._hofPending=hofEntry;} else hofSave(hofEntry); // dailies enter the Hall by invitation only
   window._lastCar=c;
   wipe();
   S=null; hud();
@@ -872,6 +878,7 @@ function retire(){
     <div style="margin-top:8px">${c.clubs.map(n=>`<span class="pill">${n}</span>`).join("")}</div>
     ${shareBtn}
     <button class="btn alt" style="margin-top:${wasDaily?"10px":"14px"}" onclick="showHistory()">📜 Season by season</button>
+    ${wasDaily?`<button class="btn alt" onclick="hofSave(window._hofPending);this.disabled=true;this.innerHTML='🏛 In the Hall ✓'">🏛 Add to Hall of Fame<span class="sub">Immortalise today's run</span></button>`:""}
     <button class="btn" style="background:#7a5cc7" onclick="managerTeaser('${pname.replace(/'/g,"")}')">🧥 Continue as manager<span class="sub">Coming soon — register your interest</span></button>
     <button class="btn gold" onclick="screenStart()">↺ New career — beat ${l.pts.toLocaleString()} pts</button>`);
   S=null;
