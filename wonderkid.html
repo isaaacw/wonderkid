@@ -1236,10 +1236,12 @@ const AV_KITS=["blueshirt","redshirt","greenshirt","orangeshirt","purpleshirt"];
 function svgAvatar(av,size){ // layered PNGs from /avatars, cropped to a circle
   av=av||{s:1,h:0,k:0};
   const sc=size/192, shirtTop=Math.round(77*sc);
+  // tries avatars/ folder first, falls back to repo root, then hides gracefully
+  const img=(f,top)=>`<img src="avatars/${f}.png" style="top:${top}px" onerror="if(!this.dataset.r){this.dataset.r=1;this.src='${f}.png';}else{this.style.display='none';}">`;
   return `<span class="avwrap" style="width:${size}px;height:${size}px">
-    <img src="avatars/${AV_SKINS[(av.s||0)%5]}.png" style="top:0" onerror="this.style.display='none'">
-    <img src="avatars/${AV_KITS[(av.k||0)%5]}.png" style="top:${shirtTop}px" onerror="this.style.display='none'">
-    <img src="avatars/${AV_HAIRS[(av.h||0)%5]}.png" style="top:0" onerror="this.style.display='none'">
+    ${img(AV_SKINS[(av.s||0)%5],0)}
+    ${img(AV_KITS[(av.k||0)%5],shirtTop)}
+    ${img(AV_HAIRS[(av.h||0)%5],0)}
   </span>`;
 }
 function avStep(key,dir){
