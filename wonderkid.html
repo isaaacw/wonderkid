@@ -134,6 +134,14 @@
     font-weight:600; padding:5px 0; border-bottom:2px dashed var(--dash); align-items:center;}
   .hrow.hhead{color:var(--muted); font-size:9.5px; letter-spacing:.07em; font-weight:800;}
   .hrow .hr{font-family:var(--display);}
+  .avwrap{display:inline-block; position:relative; border-radius:50%; overflow:hidden;
+    border:2.5px solid var(--ink); background:#fffcf2; vertical-align:middle; box-sizing:border-box; flex:none;}
+  .avwrap img{position:absolute; left:0; width:100%;}
+  .avrow{display:flex; justify-content:space-between; align-items:center; font-size:12.5px; font-weight:800; padding:3px 0;}
+  .avbtn{width:32px; height:32px; border:2px solid var(--ink); border-radius:9px; background:var(--paper);
+    color:var(--ink); font-weight:900; font-size:16px; cursor:pointer; margin-left:6px;}
+  .avbtn:active{transform:translate(1px,1px);}
+  .hofrow{display:flex; gap:10px; align-items:center; padding:8px 0; border-bottom:2px dashed var(--dash);}
   .cab{text-align:center; margin-top:8px; font-size:11.5px; font-weight:800; color:var(--ink);
     background:var(--paper); border:2px solid var(--ink); border-radius:99px; padding:4px 10px;}
   .achtoast{position:fixed; left:50%; bottom:26px; transform:translateX(-50%); z-index:40;
@@ -233,7 +241,7 @@ function potRoll(){
   const r=RNG();
   return Math.round(82+5*r+13*Math.pow(r,5));
 }
-function newGame(name,country,pos,traits,daily){
+function newGame(name,country,pos,traits,daily,av){
   S = {
     name, country, pos, traits,
     age:16, season:1, week:0,
@@ -254,6 +262,7 @@ function newGame(name,country,pos,traits,daily){
     const tk=TRAIT_POOL[S.pos].concat(SHARED_TRAITS); S.traits=[];
     while(S.traits.length<2){const t=pick(tk); if(!S.traits.includes(t))S.traits.push(t);}
   }
+  S.av=av||{s:ri(0,4),h:ri(0,4),k:ri(0,4)}; // daily rolls are seeded = same face worldwide
   S.attrs={tec: ri(40,48), pac: ri(40,48), phy: ri(33,41), men: ri(33,41)};
   S.pot=potRoll();
   S.club=makeClub(0); S.car.clubs=[S.club.name];
@@ -495,6 +504,7 @@ function seasonEnd(){
   }
   S.flags.wcYear=false;
   S.lastPos=res.pos;
+  S.car.peak=Math.max(S.car.peak||0,ovr());
   // achievements (cross-career)
   try{
     if(res.trophy&&res.cup&&res.cup.indexOf("WINNERS")===0&&res.euro&&res.euro.indexOf("CHAMPIONS")===0)ach("treble");
@@ -543,6 +553,7 @@ function legacy(){
   let pts=c.goals*2+c.assists*1.2+c.apps*0.4+c.trophies.length*90+c.awards.length*60+c.caps*4+c.intGoals*6+c.ballonDor*400;
   const w=c.wc||{titles:0,gb:0,gball:0};
   pts+=w.titles*600+w.gb*250+w.gball*250; // World Cup glory weighs heaviest
+  if(c.natCap)pts+=80; // you led your country out
   let grade="D",title="Sunday League Legend (your mates' league)";
   if(pts>250){grade="C";title="Solid Pro — a good career, honest work";}
   if(pts>700){grade="B";title="Fan Favourite — they still sing your song";}
@@ -562,7 +573,7 @@ function hud(){
   h.style.display="block";
   const bar=(l,v,c)=>`<div class="mini"><div class="lbl"><span>${l}</span><span>${Math.round(v)}</span></div><div class="track"><div class="fill" style="width:${v}%;background:${c}"></div></div></div>`;
   h.innerHTML=`
-    <div class="row1"><span class="pname">${S.name} <span style="color:var(--muted);font-weight:600;font-size:12px">${POSITIONS[S.pos].label} · ${S.age}y</span></span><span class="ovr">${ovr()}</span></div>
+    <div class="row1"><span class="pname">${svgAvatar(S.av,32)} ${S.name} <span style="color:var(--muted);font-weight:600;font-size:12px">${POSITIONS[S.pos].label} · ${S.age}y</span></span><span class="ovr">${ovr()}</span></div>
     <div class="row2"><span>${S.club.name} · ${LEAGUES[S.tier].name}</span><span class="money" title="Your personal savings">💰 Bank: ${fmtM(S.money)}</span></div>
     <div class="bars">${bar("Form",S.form,"var(--green)")}${bar("Fitness",S.fitness,"var(--blue)")}${bar("Morale",S.morale,"#e67e22")}${bar("Fame",S.rep,"var(--gold)")}</div>
     <div class="bars" style="margin-top:6px">${bar("Fans",S.fan??50,"var(--pink)")}${bar("Gaffer",S.mgr??55,"#7a5cc7")}${bar("Squad",S.team??50,"var(--orange)")}</div>
@@ -606,6 +617,7 @@ function screenStart(){
     <button class="btn ${hasSave?"alt":""}" onclick="screenCreate()">+ New career<span class="sub">Auto-saves as you go — play in bursts or binge a whole life</span></button>
     <button class="btn alt" onclick="startDaily()">📅 Daily Challenge<span class="sub">${dailyBestText()}</span></button>
     <button class="btn alt" onclick="showAchievements()">🏅 Achievements<span class="sub">${achCount()} unlocked — they survive retirement</span></button>
+    <button class="btn alt" onclick="showHall()">🏛 Hall of Fame<span class="sub">${hofAll().length?hofAll().length+" legend"+(hofAll().length>1?"s":"")+" immortalised":"Your retired careers live here"}</span></button>
    </div>`;
 }
 function screenCreate(){
@@ -615,6 +627,14 @@ function screenCreate(){
     <h2>Who are you?</h2>
     <input type="text" id="c-name" value="${name}" maxlength="20">
     <select id="c-country">${COUNTRIES.map(c=>`<option>${c}</option>`).join("")}</select>
+    <div class="kicker" style="margin-top:14px">Look</div>
+    <div style="display:flex; gap:14px; align-items:center;">
+      <div id="c-av">${svgAvatar(window._av=(window._av||{s:ri(0,4),h:ri(0,4),k:ri(0,4)}),88)}</div>
+      <div style="flex:1">
+        ${["Skin|s","Hair|h","Kit|k"].map(x=>{const[lb,ky]=x.split("|");
+          return `<div class="avrow"><span>${lb}</span><span><button class="avbtn" onclick="avStep('${ky}',-1)">‹</button><button class="avbtn" onclick="avStep('${ky}',1)">›</button></span></div>`;}).join("")}
+      </div>
+    </div>
     <div class="kicker" style="margin-top:14px">Position</div>
     <div class="choice-grid" id="c-pos">${Object.entries(POSITIONS).map(([k,v],i)=>
       `<div class="chip ${i===0?"sel":""}" data-k="${k}" onclick="selPos(this)"><div class="t">${v.label}</div><div class="d">${v.d}</div></div>`).join("")}</div>
@@ -635,12 +655,12 @@ function selTwo(el){
   el.classList.add("sel");
 }
 function startCareer(){
-  const name=$("c-name").value.trim()||"Alex Fletcher";
+  const name=($("c-name").value.replace(/[<>&"']/g,"").trim()||"Alex Fletcher").slice(0,20);
   const country=$("c-country").value;
   const pos=document.querySelector("#c-pos .sel").dataset.k;
   const traits=[...document.querySelectorAll("#c-tr .sel")].map(e=>e.dataset.k);
   if(traits.length<2){alert("Pick 2 traits!");return;}
-  wipe(); newGame(name,country,pos,traits);
+  wipe(); newGame(name,country,pos,traits,false,window._av);
   card(`
     <div class="kicker">Season 1 · Age 16</div>
     <h2>Welcome to ${S.club.name}.</h2>
@@ -814,7 +834,7 @@ function forceRetire(){
     <button class="btn" onclick="retire()">Announce retirement 🏁</button>`);
 }
 function retire(){
-  const l=legacy(); const c=S.car; const pname=S.name; const wasDaily=S.daily; const ppos=S.pos;
+  const l=legacy(); const c=S.car; const pname=S.name; const wasDaily=S.daily; const ppos=S.pos; const pav=S.av;
   adBreak(()=>{});
   const seasons=c.seasons.length;
   try{
@@ -823,6 +843,7 @@ function retire(){
     if(l.grade==="GOAT")ach("goat");
   }catch(e){}
   if(wasDaily){try{const k="wk_daily_"+wasDaily; if(l.pts>(+localStorage.getItem(k)||0))localStorage.setItem(k,l.pts);}catch(e){}}
+  hofSave({n:pname,grade:l.grade,pts:l.pts,goals:c.goals,troph:c.trophies.length,bdo:c.ballonDor||0,wc:(c.wc&&c.wc.titles)||0,peak:c.peak||0,seasons,av:pav,natCap:!!c.natCap});
   window._lastCar=c;
   wipe();
   S=null; hud();
@@ -833,6 +854,7 @@ function retire(){
     `<button class="btn" style="background:var(--blue);margin-top:${wasDaily?"10px":"14px"}" onclick="shareTxt(window._carShare)">📋 Share career</button>`;
   card(`
     <div class="kicker">Career over · ${seasons} seasons</div>
+    <div class="center" style="margin-top:6px">${svgAvatar(pav,76)}</div>
     <h2 class="center">${pname} retires.</h2>
     <div class="grade">${l.grade}</div>
     <p class="center" style="font-weight:700">${l.title}</p>
@@ -932,7 +954,7 @@ function wcEligible(){return S.flags.capped||S.rep>=40;}
 function wcStart(){S.flags.capped=true; S.wc={n:0,wins:0,out:false,champ:false,goals:0,rsum:0,used:[]}; save();}
 function wcPlayMatch(){
   const w=S.wc; const idx=w.n;
-  let r=clamp(6.1+(ovr()-80)/7.5+(S.form-50)/60+rnd(-1.1,1.1)+(S.traits.includes("clutch")?0.3:0),3.5,10);
+  let r=clamp(6.1+(ovr()-80)/7.5+(S.form-50)/60+rnd(-1.1,1.1)+(S.traits.includes("clutch")?0.3:0)+(S.flags.natCap?0.15:0),3.5,10);
   const p=POSITIONS[S.pos];
   let g=(RNG()<clamp((r-5.4)*0.25*p.goalMult*(S.attrs.tec/70),0,0.9)?1:0);
   if(g&&RNG()<0.25*p.goalMult)g++;
@@ -1114,6 +1136,7 @@ const EV_REL={
   podcast:{0:{f:5,m:-4},1:{m:3}},
   newmanager:{0:{m:12},1:{}},
   interview2:{0:{f:4,m:-3},1:{m:3}},
+  natcap:{0:{f:5,t:4},1:{}},
   refbeef:{0:{f:5,m:-4},1:{m:6}},
   invest:{},
   newdeal:{0:{f:6,m:4},1:{f:-6,m:-4}},
@@ -1146,6 +1169,13 @@ EVENTS.push(
 );
 
 EVENTS.push(
+ {id:"natcap", cond:s=>s.flags.capped&&s.car.caps>=25&&s.rep>=70&&s.age>=25&&!s.flags.natCap, kicker:"International",
+  head:"Your country needs a captain.",
+  body:s=>`The national manager calls you personally. "${s.country} walks out behind you from now on. If you'll take it."`,
+  choices:[
+   {label:"Take the armband", sub:"Lead your nation", fx:s=>{s.flags.natCap=true; s.car.natCap=true; s.rep=clamp(s.rep+6,0,100); s.attrs.men+=3; s.morale+=10;}, out:"You call your mum before you call your agent. Correct order."},
+   {label:"'I lead without it.'", sub:"No extra weight", fx:s=>{s.form+=4;}, out:"The armband goes to the keeper. You still organise the wall. Everyone knows who leads."}
+  ]},
  {id:"interview2", cond:s=>s.rep>=40&&s.age>=24, kicker:"Media",
   head:["The big Sunday sit-down interview.","Punditry duty: they hand you a touchscreen and a suit."],
   body:["'Where does this team really finish in May?' the host asks, eyebrow raised.","'Some say you've plateaued. Fair?'","'Who's the best you've played with — and why does nobody say you?'"],
@@ -1195,6 +1225,43 @@ function showAchievements(){
   ov.onclick=e=>{if(e.target===ov)ov.remove();};
   ov.innerHTML=`<div class="sheet"><h2 style="font-family:var(--display);margin-bottom:4px">🏅 Achievements</h2>
     <p style="font-size:12.5px;color:var(--muted);font-weight:600;margin-bottom:8px">${achCount()} unlocked · kept across every career</p>
+    ${rows}<button class="btn" onclick="this.closest('.overlay').remove()">Close</button></div>`;
+  document.body.appendChild(ov);
+}
+
+/* ---------------- AVATARS (artist-drawn layers: skin + shirt + hair) ---------------- */
+const AV_SKINS=["skincolour1","skincolour2","skincolour3","skincolour4","skincolour5"];
+const AV_HAIRS=["smarthairstyle","scruffyhairstyle","curlyhairstyle","wavyhairstyle","longhairstyle"];
+const AV_KITS=["blueshirt","redshirt","greenshirt","orangeshirt","purpleshirt"];
+function svgAvatar(av,size){ // layered PNGs from /avatars, cropped to a circle
+  av=av||{s:1,h:0,k:0};
+  const sc=size/192, shirtTop=Math.round(77*sc);
+  return `<span class="avwrap" style="width:${size}px;height:${size}px">
+    <img src="avatars/${AV_SKINS[(av.s||0)%5]}.png" style="top:0" onerror="this.style.display='none'">
+    <img src="avatars/${AV_KITS[(av.k||0)%5]}.png" style="top:${shirtTop}px" onerror="this.style.display='none'">
+    <img src="avatars/${AV_HAIRS[(av.h||0)%5]}.png" style="top:0" onerror="this.style.display='none'">
+  </span>`;
+}
+function avStep(key,dir){
+  const lens={s:5,h:5,k:5};
+  window._av[key]=((window._av[key]||0)+dir+lens[key])%lens[key];
+  const el=document.getElementById("c-av"); if(el)el.innerHTML=svgAvatar(window._av,88);
+}
+
+/* ---------------- HALL OF FAME (legends persist forever) ---------------- */
+function hofAll(){try{return JSON.parse(localStorage.getItem("wk_hof")||"[]");}catch(e){return[];}}
+function hofSave(e){try{const h=hofAll();h.unshift(e);localStorage.setItem("wk_hof",JSON.stringify(h.slice(0,50)));}catch(err){}}
+function showHall(){
+  const h=hofAll().slice().sort((a,b)=>b.pts-a.pts);
+  if(!h.length){alert("No legends yet. Retire a career and it lives here forever.");return;}
+  const rows=h.map((e,ix)=>`<div class="hofrow">${svgAvatar(e.av,44)}
+    <div style="flex:1"><b>${e.n}</b> <span class="pill" style="padding:1px 8px">${e.grade}</span>${e.natCap?" ©":""}
+    <br><span style="font-size:11.5px;color:var(--muted);font-weight:600">${(e.pts||0).toLocaleString()} pts · ${e.goals}⚽ · ${e.troph}🏆${e.bdo?` · ${e.bdo}✨`:""}${e.wc?` · ${e.wc}🌍`:""} · peak ${e.peak} · ${e.seasons} ssns</span></div>
+    ${ix===0?'<span style="font-size:20px">👑</span>':""}</div>`).join("");
+  const ov=document.createElement("div"); ov.className="overlay";
+  ov.onclick=e=>{if(e.target===ov)ov.remove();};
+  ov.innerHTML=`<div class="sheet"><h2 style="font-family:var(--display);margin-bottom:4px">🏛 Hall of Fame</h2>
+    <p style="font-size:12.5px;color:var(--muted);font-weight:600;margin-bottom:8px">Every retired career, immortalised</p>
     ${rows}<button class="btn" onclick="this.closest('.overlay').remove()">Close</button></div>`;
   document.body.appendChild(ov);
 }
