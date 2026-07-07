@@ -1233,15 +1233,20 @@ function showAchievements(){
 const AV_SKINS=["skincolour1","skincolour2","skincolour3","skincolour4","skincolour5"];
 const AV_HAIRS=["smarthairstyle","scruffyhairstyle","curlyhairstyle","wavyhairstyle","longhairstyle"];
 const AV_KITS=["blueshirt","redshirt","greenshirt","orangeshirt","purpleshirt"];
+const AV_OFF={ // per-layer nudges [dx,dy] in px at 192-wide scale, tuned visually
+  skincolour3:[-5,0], blueshirt:[0,-3], redshirt:[-3,0], greenshirt:[-4,-8], purpleshirt:[0,-16]
+};
 function svgAvatar(av,size){ // layered PNGs from /avatars, cropped to a circle
   av=av||{s:1,h:0,k:0};
-  const sc=size/192, shirtTop=Math.round(77*sc);
+  const sc=size/192;
+  const skin=AV_SKINS[(av.s||0)%5], kit=AV_KITS[(av.k||0)%5], hair=AV_HAIRS[(av.h||0)%5];
+  const so=AV_OFF[skin]||[0,0], ko=AV_OFF[kit]||[0,0];
   // tries avatars/, then avatars/avatars/ (nested zip extraction), then repo root, then hides
-  const img=(f,top)=>`<img src="avatars/${f}.png" style="top:${top}px" onerror="var r=+(this.dataset.r||0);this.dataset.r=r+1;if(r===0)this.src='avatars/avatars/${f}.png';else if(r===1)this.src='${f}.png';else this.style.display='none';">`;
+  const img=(f,dx,dy)=>`<img src="avatars/${f}.png" style="left:${Math.round(dx*sc)}px;top:${Math.round(dy*sc)}px" onerror="var r=+(this.dataset.r||0);this.dataset.r=r+1;if(r===0)this.src='avatars/avatars/${f}.png';else if(r===1)this.src='${f}.png';else this.style.display='none';">`;
   return `<span class="avwrap" style="width:${size}px;height:${size}px">
-    ${img(AV_SKINS[(av.s||0)%5],0)}
-    ${img(AV_KITS[(av.k||0)%5],shirtTop)}
-    ${img(AV_HAIRS[(av.h||0)%5],0)}
+    ${img(skin,so[0],so[1])}
+    ${img(kit,ko[0],77+ko[1])}
+    ${img(hair,so[0],so[1])}
   </span>`;
 }
 function avStep(key,dir){
