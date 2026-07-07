@@ -134,6 +134,8 @@
     font-weight:600; padding:5px 0; border-bottom:2px dashed var(--dash); align-items:center;}
   .hrow.hhead{color:var(--muted); font-size:9.5px; letter-spacing:.07em; font-weight:800;}
   .hrow .hr{font-family:var(--display);}
+  .cab{text-align:center; margin-top:8px; font-size:11.5px; font-weight:800; color:var(--ink);
+    background:var(--paper); border:2px solid var(--ink); border-radius:99px; padding:4px 10px;}
   .achtoast{position:fixed; left:50%; bottom:26px; transform:translateX(-50%); z-index:40;
     background:var(--gold); color:#171310; border:var(--line); box-shadow:var(--shadow);
     border-radius:99px; padding:11px 22px; font-size:14px; font-weight:700;
@@ -292,7 +294,7 @@ const EVENTS = [
    {label:"Go out", sub:"+morale, risk to form", fx:s=>{s.morale+=10; if(RNG()<0.4){s.form-=12; s.flags.tabloid=true;} }, out:s=>s.flags.tabloid?"Great night. Less great: the back page reads 'STARLET IN 3AM KEBAB SHAME'.":"Great night, no headlines. The dressing room loves you."},
    {label:"Head home", sub:"+form, the lads notice", fx:s=>{s.form+=6; s.morale-=4;}, out:"You're fresh as a daisy in training Monday. The banter about your 'granny lifestyle' writes itself."}
   ]},
- {id:"interview", cond:s=>s.rep>=15, kicker:"Media", head:"Live TV interview after your strong run of form.",
+ {id:"interview", cond:s=>s.rep>=15&&s.age<=23, kicker:"Media", head:"Live TV interview after your strong run of form.",
   body:["The presenter leans in: 'Are you the best young player in the league?'","On the sofa, lights hot, the host asks: 'Better than Danilo Reyes — yes or no?'","A mic appears at full-time: 'People say you're the most exciting thing in this league. Are they right?'"],
   choices:[
    {label:"'Honestly? Yes.'", sub:"Bold. Very bold.", fx:s=>{s.rep+=6; s.form-=4; s.flags.target=true;}, out:"Clips everywhere. Defenders now introduce themselves to your ankles personally."},
@@ -401,7 +403,7 @@ function simWeek(){
       +(S.traits.includes("wall")?0.15:0)+(derby&&i===0&&S.traits.includes("clutch")?0.5:0)
       +((S.team??50)-50)/250; // teammates play for players they respect
     r=clamp(r,3.5,10);
-    const gChance=clamp((r-5.4)*0.28*p.goalMult*(S.attrs.tec/70)*(S.traits.includes("finisher")?1.3:1)
+    const gChance=clamp((r-5.4)*0.265*p.goalMult*(S.attrs.tec/70)*(S.traits.includes("finisher")?1.3:1)
       *(S.traits.includes("deadball")?1.25:1)*(S.traits.includes("aerial")?1.8:1),0,0.95);
     let g=(RNG()<gChance?1:0)+(RNG()<gChance*0.3?1:0);
     if(S.pos==="ST"&&g===2&&RNG()<0.3){g=3;x1++;} // the match ball is coming home
@@ -426,8 +428,8 @@ function simWeek(){
   if(avg>6.9&&RNG()<0.4+(S.mgr??55)/250) S.role={prospect:"rotation",rotation:"starter",starter:"star",star:"star"}[S.role]; // the gaffer's trust opens doors
   if(avg<5.4&&RNG()<0.55-(S.mgr??55)/300) S.role={star:"starter",starter:"rotation",rotation:"rotation",prospect:"prospect"}[S.role];
   // relationships breathe with performances
-  S.fan=clamp((S.fan??50)+goals*0.8+(avg>7?0.6:avg<5.8?-0.8:0)+(50-(S.fan??50))*0.04,0,100);
-  S.mgr=clamp((S.mgr??55)+(avg>6.8?0.8:avg<5.8?-1:0)+(50-(S.mgr??55))*0.04,0,100);
+  S.fan=clamp((S.fan??50)+goals*0.6+(avg>7?0.45:avg<5.8?-0.8:0)+(50-(S.fan??50))*0.04,0,100);
+  S.mgr=clamp((S.mgr??55)+(avg>6.8?1.0:avg<5.8?-0.75:0)+(50-(S.mgr??55))*0.04,0,100);
   S.team=clamp((S.team??50)+assists*0.7+motm*0.5+(50-(S.team??50))*0.04,0,100);
   // wages accumulate (block ≈ 4 weeks)
   const pay=S.wage*4*LEAGUES[S.tier].wageMult; S.money+=pay; S.car.earnings+=pay;
@@ -446,24 +448,23 @@ function seasonEnd(){
   const res={avg, ...S.ssn, awards:[], trophy:null, offers:[]};
   // league outcome
   const clubEdge=S.club.str-LEAGUES[S.tier].avg; // giants dominate their league
-  const teamScore=(avg-6.3)*3 + clubEdge*0.7 + rnd(-5,5);
+  const teamScore=(avg-6.3)*3.5 + clubEdge*0.7 + rnd(-4,4);
   res.pos=clamp(Math.round(10.5-teamScore*1.8+rnd(-2,2)),1,20);
+  // a player having THAT kind of season drags the team up with him
+  if(avg>7.4)res.pos=Math.min(res.pos,12);
+  if(avg>7.8)res.pos=Math.min(res.pos,8);
   if(res.pos===1){ res.trophy=(S.tier===4?"Continental Elite Title":LEAGUES[S.tier].name+" Title"); S.car.trophies.push(res.trophy); S.rep=clamp(S.rep+6,0,100);
     if(S.tier<4)S.flags.promo=true; // champions go up
   }
+  if(res.pos>=18&&S.tier>0)S.flags.releg=true; // bottom three go down
   // awards
-  if(avg>7.3&&S.ssn.goals>=15&&S.pos!=="CB"){res.awards.push("League Top Scorer"); S.rep=clamp(S.rep+5,0,100);}
+  if(avg>7.3&&S.ssn.goals>=16&&S.pos!=="CB"){res.awards.push("League Top Scorer"); S.rep=clamp(S.rep+5,0,100);}
   if(avg>7.5){res.awards.push("Team of the Season"); S.rep=clamp(S.rep+4,0,100);}
-  if(avg>7.65&&S.ssn.apps>=18){res.awards.push("⭐ League Player of the Season"); S.rep=clamp(S.rep+5,0,100);}
-  // Ballon d'Or: the reason to keep playing. World-class season, at the top,
-  // in a title race, world-famous — and even then the vote can betray you.
-  if(S.tier===4&&S.rep>85&&ovr()>=95&&avg>7.4+S.car.ballonDor*0.15){
-    if(res.pos<=2&&RNG()<0.4){res.awards.push("🏆 BALLON D'OR"); S.car.ballonDor++; S.rep=100; ach("bdo"); if(S.car.ballonDor>=3)ach("bdo3");}
-    else res.awards.push("Ballon d'Or: 2nd in the vote. Robbed.");
-  }
+  if(avg>7.7&&S.ssn.apps>=18){res.awards.push("⭐ League Player of the Season"); S.rep=clamp(S.rep+5,0,100);}
+  // (Ballon d'Or vote happens after the cups are decided — see below)
   // relationship season drift
-  if(res.pos<=4)S.fan=clamp((S.fan??50)+4,0,100);
-  if(avg>6.8)S.mgr=clamp((S.mgr??55)+4,0,100);
+  if(res.pos<=4)S.fan=clamp((S.fan??50)+3,0,100);
+  if(avg>6.8)S.mgr=clamp((S.mgr??55)+5,0,100);
   // domestic cup (top two levels)
   if(S.tier>=3){
     const perf=(avg-6.5)*0.08+(S.club.str-LEAGUES[S.tier].avg)*0.02;
@@ -480,11 +481,19 @@ function seasonEnd(){
     else if(ec>=3)S.rep=clamp(S.rep+3,0,100);
   }
   S.flags.euroSpot=(S.tier===3&&res.pos<=4);
-  // Ballon d'Or world ranking (elite players only)
-  if(S.tier===4&&ovr()>=90&&S.rep>=70){
-    const score=(ovr()-88)*3+(avg-6.5)*6+(res.trophy?4:0);
-    res.bdoRank=res.awards.includes("🏆 BALLON D'OR")?1:(res.awards.some(a=>a.indexOf("2nd in the vote")>=0)?2:clamp(Math.round(50-score+rnd(-3,3)),3,50));
+  // Ballon d'Or: trophies win votes. No silverware, no serious candidacy.
+  if(S.tier===4&&ovr()>=88&&S.rep>=60){
+    const tr=(res.pos===1?1:0)+(res.cup&&res.cup.indexOf("WINNERS")===0?1:0)+(res.euro&&res.euro.indexOf("CHAMPIONS")===0?1:0);
+    const personal=res.awards.length?1:0; // top scorer / player of the season etc.
+    let score=tr*9+(S.flags.wcYear?9:0)+personal*5+(ovr()-88)*1.2+(avg-6.8)*4;
+    let rank=clamp(Math.round(45-score+rnd(-3,3)),1,50);
+    if(tr===0)rank=Math.max(rank,15);                       // voters need trophies
+    if(rank===1&&(tr<2||ovr()<95||RNG()<0.45))rank=2;       // winning it takes everything
+    if(rank===1){res.awards.push("🏆 BALLON D'OR"); S.car.ballonDor++; S.rep=100; ach("bdo"); if(S.car.ballonDor>=3)ach("bdo3");}
+    else if(rank===2&&tr>=2)res.awards.push("Ballon d'Or: 2nd in the vote. Robbed.");
+    res.bdoRank=rank;
   }
+  S.flags.wcYear=false;
   S.lastPos=res.pos;
   // achievements (cross-career)
   try{
@@ -520,8 +529,8 @@ function seasonEnd(){
 function ageUp(){
   S.age++; S.season++; S.week=0;
   // repeatable events can fire again next season
-  ["nightout","interview","gaffer","derby","injury_choice","newdeal"].forEach(id=>delete S.flags["done_"+id]);
-  if(S.season%2===0)delete S.flags["done_newmanager"]; // managerial merry-go-round spins slower
+  ["nightout","gaffer","derby","injury_choice","newdeal"].forEach(id=>delete S.flags["done_"+id]);
+  if(S.season%2===0){["newmanager","interview","interview2"].forEach(id=>delete S.flags["done_"+id]);} // slower-burn events
   S.flags.tabloid=false;
   S.ssn={apps:0,goals:0,assists:0,rsum:0,motm:0,x1:0,x2:0};
   S.fitness=100; S.form=clamp(S.form*0.5+25,20,80);
@@ -562,6 +571,7 @@ function hud(){
       <span>PHY <b>${Math.round(S.attrs.phy)}</b></span><span>MEN <b>${Math.round(S.attrs.men)}</b></span>
       <span>WAGE <b>${fmtM(S.wage*LEAGUES[S.tier].wageMult)}</b>/wk</span>
     </div>
+    ${cabinet(S.car)?`<div class="cab" title="Trophy cabinet">${cabinet(S.car)}</div>`:""}
     <div class="histlink" onclick="showHistory()">📜 Career history</div>`;
   $("seasonbar").style.display="block";
   $("sb-label").textContent=`Season ${S.season} · ${S.club.name}`;
@@ -747,7 +757,7 @@ function acceptOffer(i){
   window._lastFee=fee;
   S.club=o.club; S.tier=o.tier; S.wage=o.wage; S.role="rotation";
   S.rep=clamp(S.rep+5,0,100); S.contractYears=3;
-  S.flags.bigMove=S.season; S.flags.promo=false; // your old club goes up without you
+  S.flags.bigMove=S.season; S.flags.promo=false; S.flags.releg=false; // your old club's fate is no longer yours
   if(!S.car.clubs.includes(o.club.name))S.car.clubs.push(o.club.name);
   // new club, new relationships — how are you received?
   const rec=pick([
@@ -783,16 +793,18 @@ function afterMove(){
 function staySeason(){
   if(S.age>=38||(S.age>=35&&ovr()<62)){forceRetire();return;}
   if(S.flags.promo&&S.tier<4){S.tier++; S.club.tier=S.tier; S.flags.justPromo=true;} // promoted with your club
-  S.flags.promo=false;
+  else if(S.flags.releg&&S.tier>0){S.tier--; S.club.tier=S.tier; S.flags.justReleg=true;} // down you go
+  S.flags.promo=false; S.flags.releg=false;
   ageUp();
   if(wcDue()&&wcEligible()){wcIntro();return;}
   if(wcDue()){wcSofa();return;}
   preSeason();
 }
 function preSeason(){
-  const promo=S.flags.justPromo; S.flags.justPromo=false; save();
-  card(`<div class="kicker">Season ${S.season} · Age ${S.age}</div><h2>${promo?"PROMOTED! 🎉":"Pre-season begins."}</h2>
+  const promo=S.flags.justPromo, releg=S.flags.justReleg; S.flags.justPromo=false; S.flags.justReleg=false; save();
+  card(`<div class="kicker">Season ${S.season} · Age ${S.age}</div><h2>${promo?"PROMOTED! 🎉":releg?"Relegated. 😔":"Pre-season begins."}</h2>
    ${promo?`<p><b>${S.club.name} are going up.</b> Welcome to the ${LEAGUES[S.tier].name} — bigger grounds, sharper defenders, better wages. The open-top bus parade lasted four hours.</p>`:""}
+   ${releg?`<p><b>${S.club.name} are going down.</b> Welcome to the ${LEAGUES[S.tier].name} — smaller crowds, angrier phone-ins, and a dressing room that needs dragging back up. Loyalty now would make you a legend. Just saying.</p>`:""}
    <p>${pick(PRESEASON_LINES)}</p>
    <p style="margin-top:8px">Training focus this season:</p>${trainBtns()}`);
 }
@@ -838,7 +850,7 @@ function retire(){
     <div style="margin-top:8px">${c.clubs.map(n=>`<span class="pill">${n}</span>`).join("")}</div>
     ${shareBtn}
     <button class="btn alt" style="margin-top:${wasDaily?"10px":"14px"}" onclick="showHistory()">📜 Season by season</button>
-    <button class="btn" style="background:#7a5cc7" onclick="managerTeaser('${pname.replace(/'/g,"")}')">🧥 Continue as manager<span class="sub">Take the touchline</span></button>
+    <button class="btn" style="background:#7a5cc7" onclick="managerTeaser('${pname.replace(/'/g,"")}')">🧥 Continue as manager<span class="sub">Coming soon — register your interest</span></button>
     <button class="btn gold" onclick="screenStart()">↺ New career — beat ${l.pts.toLocaleString()} pts</button>`);
   S=null;
 }
@@ -946,7 +958,7 @@ function wcFinish(){
   const out={champ:w.champ,goals:w.goals,avg,games:w.n,gb:false,gball:false};
   S.car.wc=S.car.wc||{titles:0,gb:0,gball:0,apps:0};
   S.car.wc.apps++;
-  if(w.champ){S.car.wc.titles++; S.car.trophies.push("🌍 WORLD CUP"); S.rep=100; S.form=clamp(S.form+15,5,98); S.morale=100; ach("worldcup");}
+  if(w.champ){S.car.wc.titles++; S.car.trophies.push("🌍 WORLD CUP"); S.rep=100; S.form=clamp(S.form+15,5,98); S.morale=100; S.flags.wcYear=true; ach("worldcup");}
   if(w.goals>=7){out.gb=true; S.car.wc.gb++; S.car.awards.push("World Cup Golden Boot"); ach("wcboot");}
   if(avg>=8.0&&w.n>=7){out.gball=true; S.car.wc.gball++; S.car.awards.push("World Cup Golden Ball");}
   if(!w.champ&&w.n>=6)S.rep=clamp(S.rep+6,0,100);
@@ -1101,6 +1113,7 @@ const EV_REL={
   mentor:{0:{t:12,f:4},1:{t:-4}},
   podcast:{0:{f:5,m:-4},1:{m:3}},
   newmanager:{0:{m:12},1:{}},
+  interview2:{0:{f:4,m:-3},1:{m:3}},
   refbeef:{0:{f:5,m:-4},1:{m:6}},
   invest:{},
   newdeal:{0:{f:6,m:4},1:{f:-6,m:-4}},
@@ -1129,6 +1142,16 @@ EVENTS.push(
   choices:[
    {label:"Give a proper speech", sub:"Own the moment", fx:s=>{s.flags.squadglue=true; s.morale+=8; s.team=clamp(s.team+6,0,100); s.attrs.men+=2;}, out:"You thank the kitman first. Grown men wipe their eyes. Standard."},
    {label:"Buy everyone dinner", sub:"Deeds not words", fx:s=>{s.flags.squadglue=true; s.money-=20000; s.team=clamp(s.team+8,0,100); s.morale+=6;}, out:"The bill is horrifying. The left-back orders two mains. Worth every penny."}
+  ]}
+);
+
+EVENTS.push(
+ {id:"interview2", cond:s=>s.rep>=40&&s.age>=24, kicker:"Media",
+  head:["The big Sunday sit-down interview.","Punditry duty: they hand you a touchscreen and a suit."],
+  body:["'Where does this team really finish in May?' the host asks, eyebrow raised.","'Some say you've plateaued. Fair?'","'Who's the best you've played with — and why does nobody say you?'"],
+  choices:[
+   {label:"Big claims, big headlines", sub:"+fame, adds pressure", fx:s=>{s.rep+=4; s.form-=3;}, out:["The quote runs everywhere. Now you have to back it up on grass.","Your manager texts: 'nice interview.' No emoji. Terrifying."]},
+   {label:"Boring, professional answers", sub:"Safe", fx:s=>{s.morale+=3; s.attrs.men+=1;}, out:["'Consummate professional,' writes the paper — journalist for 'gave us nothing'.","Nobody clips it. Perfect."]}
   ]}
 );
 
@@ -1176,13 +1199,24 @@ function showAchievements(){
   document.body.appendChild(ov);
 }
 
+/* ---------------- TROPHY CABINET ---------------- */
+function cabinet(c){
+  if(!c)return "";
+  const eu=c.trophies.filter(t=>t.indexOf("EUROPEAN CUP")>=0).length;
+  const lg=c.trophies.filter(t=>t.indexOf("Title")>=0).length;
+  const cup=c.trophies.filter(t=>t.indexOf("Cup")>=0&&t.indexOf("EUROPEAN")<0&&t.indexOf("WORLD")<0).length;
+  const wc=(c.wc&&c.wc.titles)||0;
+  const items=[[c.ballonDor||0,"✨ Ballon d'Or"],[wc,"🌍 World Cup"],[eu,"🏆 European Cup"],[lg,"🏅 League title"],[cup,"🥈 Cup"]].filter(x=>x[0]>0);
+  return items.slice(0,3).map(x=>`${x[1]} ×${x[0]}`).join(" · ");
+}
+
 /* ---------------- MANAGER MODE TEASER (measuring demand via GA) ---------------- */
 function managerTeaser(pname){
   try{if(typeof gtag==="function")gtag('event','manager_teaser_click');}catch(e){}
-  card(`<div class="kicker">🧥 The next chapter</div>
-    <h2>${pname||"You"} starts the coaching badges.</h2>
-    <p>Fifteen years of dressing rooms, and now a laminated folder full of drills. The tracksuit fits differently when you're the one holding the whistle.</p>
-    <p style="margin-top:8px"><b>Manager Mode is coming soon.</b> Same leagues, same clubs — but this time you pick the team, spend the budget, and get the sack.</p>
+  card(`<div class="kicker">🧥 Coming soon</div>
+    <h2>Manager Mode isn't in the game yet.</h2>
+    <p>But ${pname||"your legend"} has started the coaching badges, and we're building the dugout: same leagues, same clubs — you pick the team, spend the budget, and eventually get the sack.</p>
+    <p style="margin-top:8px">Your click counts as a vote for it — the more retired legends knock on this door, the faster it gets built. 📊</p>
     <button class="btn gold" onclick="screenStart()">↺ Back to the pitch — new career</button>`);
 }
 
