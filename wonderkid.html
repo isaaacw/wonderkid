@@ -194,7 +194,17 @@ const CLUB_NAMES = [
   ["Real Costa Dorada","Bayern Adler","AC Fortezza","Paris Lumière","Sporting Atlântico","Ajax Oranje","Real Madrigal","Internazionale Azzurro","Borussia Westfalen","Olympique Azur","Benfica Estrela","Galata Bosphorus"]
 ];
 const T4_INFO={"Real Costa Dorada":"Iberia","Bayern Adler":"Bavaria","AC Fortezza":"Italia","Paris Lumière":"Gallia","Sporting Atlântico":"Lusitania","Ajax Oranje":"the Lowlands","Real Madrigal":"Iberia","Internazionale Azzurro":"Italia","Borussia Westfalen":"Bavaria","Olympique Azur":"Gallia","Benfica Estrela":"Lusitania","Galata Bosphorus":"Anatolia"};
-const COUNTRIES = ["England","Brazil","France","Spain","Germany","Argentina","Nigeria","USA","Japan","Netherlands","Portugal","Croatia"];
+// fixed prestige: giants dominate their domestic scene like real-world superclubs
+const T4_PRESTIGE={"Real Costa Dorada":91,"Bayern Adler":90,"Real Madrigal":90,"Paris Lumière":89,
+"AC Fortezza":87,"Internazionale Azzurro":87,"Ajax Oranje":86,"Benfica Estrela":86,
+"Borussia Westfalen":85,"Sporting Atlântico":84,"Olympique Azur":84,"Galata Bosphorus":83};
+// nation tiers: 3⭐ powerhouse, 2⭐ contender, 1⭐ underdog (affects World Cup odds; underdog triumphs count double in legend)
+const NATIONS = {
+  England:3, Brazil:3, France:3, Argentina:3, Germany:3, Spain:3,
+  Italy:2, Netherlands:2, Portugal:2, Croatia:2, Belgium:2, Uruguay:2, Colombia:2, Morocco:2, Japan:2, Senegal:2, "South Korea":2,
+  USA:1, Nigeria:1, Ghana:1, Australia:1, Denmark:1, Poland:1, Mexico:1, Canada:1
+};
+const COUNTRIES = Object.keys(NATIONS);
 const POSITIONS = {
   ST:{label:"Striker",     d:"Goals win Ballon d'Ors", goalMult:1.0,  astMult:0.35, x:["Hat-tricks"], xi:["🎩"]},
   W: {label:"Winger",      d:"Flair, pace, highlights", goalMult:0.6, astMult:0.8,  x:["Dangerous crosses"], xi:["🌀"]},
@@ -277,7 +287,9 @@ function newGame(name,country,pos,traits,daily,av){
 }
 function makeClub(tier){
   const league=LEAGUES[tier];
-  return {name:pick(CLUB_NAMES[tier]), tier, str:clamp(league.avg+ri(-6,6),40,95)};
+  const name=pick(CLUB_NAMES[tier]);
+  const str=(tier===4&&T4_PRESTIGE[name])?T4_PRESTIGE[name]+ri(-1,1):clamp(league.avg+ri(-6,6),40,95);
+  return {name, tier, str};
 }
 function ovr(){
   const a=S.attrs, w={ST:[.38,.22,.2,.2],W:[.34,.3,.14,.22],AM:[.42,.16,.14,.28],CB:[.24,.18,.34,.24]}[S.pos];
@@ -470,21 +482,22 @@ function seasonEnd(){
   // awards
   if(avg>7.3&&S.ssn.goals>=15&&S.pos!=="CB"){res.awards.push("League Top Scorer"); S.rep=clamp(S.rep+5,0,100);}
   if(avg>7.5){res.awards.push("Team of the Season"); S.rep=clamp(S.rep+4,0,100);}
-  if(avg>7.7&&S.ssn.apps>=18){res.awards.push("⭐ League Player of the Season"); S.rep=clamp(S.rep+5,0,100);}
+  if(avg>7.7&&S.ssn.apps>=18&&S.age>=23){res.awards.push("⭐ League Player of the Season"); S.rep=clamp(S.rep+5,0,100);}
+  else if(avg>7.4&&S.ssn.apps>=16&&S.age<=22){res.awards.push("🌟 Young Player of the Season"); S.rep=clamp(S.rep+4,0,100);}
   // (Ballon d'Or vote happens after the cups are decided — see below)
   // relationship season drift
   if(res.pos<=4)S.fan=clamp((S.fan??50)+3,0,100);
   if(avg>6.8)S.mgr=clamp((S.mgr??55)+5,0,100);
   // domestic cup (top two levels)
   if(S.tier>=3){
-    const perf=(avg-6.5)*0.08+(S.club.str-LEAGUES[S.tier].avg)*0.02;
+    const perf=(avg-6.5)*0.08+(S.club.str-LEAGUES[S.tier].avg)*0.045; // strong clubs hoover up domestic cups
     const dc=cupRun([0.62,0.55,0.5,0.45,0.42],perf);
     res.cup=["R32","R16","QF","SF","Final — lost","WINNERS 🏆"][dc];
     if(dc===5){const t=(S.tier===4?"Elite Cup":"Albion Cup"); S.car.trophies.push(t); S.rep=clamp(S.rep+4,0,100);}
   }
   // European Cup: the hardest prize in club football
   if(S.tier===4||(S.tier===3&&S.flags.euroSpot)){
-    const perf=(avg-6.5)*0.08+(S.club.str-LEAGUES[S.tier].avg)*0.015;
+    const perf=(avg-6.5)*0.08+(S.club.str-LEAGUES[S.tier].avg)*0.01; // Europe humbles everyone
     const ec=cupRun([0.58,0.40,0.36,0.32,0.28],perf);
     res.euro=["Group stage","R16","QF","SF","Final — lost","CHAMPIONS 🏆🏆"][ec];
     if(ec===5){S.car.trophies.push("🏆 EUROPEAN CUP"); S.car.awards.push("European Champion"); S.rep=clamp(S.rep+10,0,100);}
@@ -555,6 +568,7 @@ function legacy(){
   const w=c.wc||{titles:0,gb:0,gball:0};
   pts+=w.titles*600+w.gb*250+w.gball*250; // World Cup glory weighs heaviest
   if(c.natCap)pts+=80; // you led your country out
+  if(c.wcUnderdog)pts+=250; // the miracle weighs more than the medal
   let grade="D",title="Sunday League Legend (your mates' league)";
   if(pts>250){grade="C";title="Solid Pro — a good career, honest work";}
   if(pts>700){grade="B";title="Fan Favourite — they still sing your song";}
@@ -631,7 +645,7 @@ function screenCreate(){
     <div class="kicker">Create your player</div>
     <h2>Who are you?</h2>
     <input type="text" id="c-name" value="${name}" maxlength="20">
-    <select id="c-country">${COUNTRIES.map(c=>`<option>${c}</option>`).join("")}</select>
+    <select id="c-country">${COUNTRIES.map(c=>`<option value="${c}">${c} ${"⭐".repeat(NATIONS[c])}</option>`).join("")}</select>
     <div class="kicker" style="margin-top:14px">Look</div>
     <div style="display:flex; gap:14px; align-items:center;">
       <div id="c-av">${svgAvatar(window._av=(window._av||{s:ri(0,4),h:ri(0,4),k:ri(0,4)}),88)}</div>
@@ -955,7 +969,7 @@ function showHistory(){
 
 /* ---------------- WORLD CUP ---------------- */
 const WC_STAGES=["Group stage · Game 1","Group stage · Game 2","Group stage · Game 3","Round of 16","Quarter-final","Semi-final","THE FINAL"];
-const WC_OPP=["Brazil","Germany","Argentina","France","Spain","Italy","Netherlands","Portugal","England","Uruguay","Japan","Morocco","USA","Croatia","Belgium","Senegal","Mexico","Denmark"];
+const WC_OPP=COUNTRIES;
 function wcDue(){return S.season%4===3;}
 function wcEligible(){return S.flags.capped||S.rep>=40;}
 function wcStart(){S.flags.capped=true; S.wc={n:0,wins:0,out:false,champ:false,goals:0,rsum:0,used:[]}; save();}
@@ -969,7 +983,8 @@ function wcPlayMatch(){
   w.goals+=g; w.rsum+=r;
   S.car.caps++; S.car.intGoals+=g;
   const base=[0.74,0.68,0.62,0.5,0.42,0.36,0.30][idx];
-  const win=RNG()<clamp(base+(r-6.5)*0.05,0.05,0.93);
+  const natMod=((NATIONS[S.country]||2)-2)*0.045; // powerhouses cruise, underdogs grind
+  const win=RNG()<clamp(base+natMod+(r-6.5)*0.05,0.05,0.93);
   w.used=w.used||[];
   let opp; do{opp=pick(WC_OPP);}while(opp===S.country||w.used.includes(opp));
   w.used.push(opp);
@@ -987,7 +1002,8 @@ function wcFinish(){
   const out={champ:w.champ,goals:w.goals,avg,games:w.n,gb:false,gball:false};
   S.car.wc=S.car.wc||{titles:0,gb:0,gball:0,apps:0};
   S.car.wc.apps++;
-  if(w.champ){S.car.wc.titles++; S.car.trophies.push("🌍 WORLD CUP"); S.rep=100; S.form=clamp(S.form+15,5,98); S.morale=100; S.flags.wcYear=true; ach("worldcup");}
+  if(w.champ){S.car.wc.titles++; S.car.trophies.push("🌍 WORLD CUP"); S.rep=100; S.form=clamp(S.form+15,5,98); S.morale=100; S.flags.wcYear=true; ach("worldcup");
+    if((NATIONS[S.country]||2)===1){S.car.wcUnderdog=true; ach("wcminnow");}}
   if(w.goals>=7){out.gb=true; S.car.wc.gb++; S.car.awards.push("World Cup Golden Boot"); ach("wcboot");}
   if(avg>=8.0&&w.n>=7){out.gball=true; S.car.wc.gball++; S.car.awards.push("World Cup Golden Ball");}
   if(!w.champ&&w.n>=6)S.rep=clamp(S.rep+6,0,100);
@@ -1106,7 +1122,7 @@ EVENTS.push(
  {id:"mentor", cond:s=>s.age>=30&&!s.flags.mentor, kicker:"Training ground", head:"A 16-year-old academy kid asks if you'll stay out after training with him.",
   body:"He has your old poster on his wall. He also has the pace you no longer have.",
   choices:[
-   {label:"Take him under your wing", sub:"Legacy stuff", fx:s=>{s.flags.mentor=true; s.morale+=10; s.attrs.men+=2; s.rep+=3;}, out:"He scores in the cup and points at you on the bench. Something in your eye again."},
+   {label:"Take him under your wing", sub:"Legacy stuff", fx:s=>{s.flags.mentor=true; s.flags.mentorSsn=s.season; s.morale+=10; s.attrs.men+=2; s.rep+=3;}, out:"He scores in the cup and points at you on the bench. Something in your eye again."},
    {label:"'Ask me next season, kid.'", sub:"Protect your minutes", fx:s=>{s.flags.mentor=true; s.form+=4;}, out:"You need every session for yourself these days. The kid says he understands. That's the worst part."}
   ]},
  {id:"homesick", cond:s=>s.tier>=3&&s.age<=24&&!s.flags.homesick, kicker:"Off the pitch", head:"3am. You can't sleep. You miss home.",
@@ -1176,6 +1192,13 @@ EVENTS.push(
 );
 
 EVENTS.push(
+ {id:"mentorpayoff", cond:s=>s.flags.mentor&&s.flags.mentorSsn&&s.season>=s.flags.mentorSsn+3&&!s.flags.mentorDone, kicker:"Full circle",
+  head:"The kid you mentored just made his international debut.",
+  body:["In the post-match interview they ask who shaped him. He says your name first, before his parents. His mum will forgive him. Eventually.","He's everywhere now — and in every interview, there's your name. 'He stayed out with me after training when he didn't have to.'"],
+  choices:[
+   {label:"Send him a message", sub:"The torch passes", fx:s=>{s.flags.mentorDone=true; s.morale+=12; s.rep+=5; s.attrs.men+=2; s.money+=0;}, out:"He replies with a photo: your old poster, still on his childhood wall. Right. Something in your eye. Again. Every time."},
+   {label:"Say nothing, just smile", sub:"Quiet pride", fx:s=>{s.flags.mentorDone=true; s.morale+=8; s.form+=5;}, out:"Some things don't need saying. You play your next match like a man ten years younger."}
+  ]},
  {id:"natcap", cond:s=>s.flags.capped&&s.car.caps>=25&&s.rep>=70&&s.age>=25&&!s.flags.natCap, kicker:"International",
   head:"Your country needs a captain.",
   body:s=>`The national manager calls you personally. "${s.country} walks out behind you from now on. If you'll take it."`,
@@ -1210,6 +1233,7 @@ const ACH={
   perfect:{t:"Untouchable",d:"Average 8.0+ over a 20+ game season"},
   legend:{t:"Hall of Famer",d:"Retire with an S grade or better"},
   goat:{t:"The GOAT",d:"Retire with the GOAT grade"},
+  wcminnow:{t:"Against All Odds",d:"Win the World Cup with an underdog nation"},
 };
 function achGot(){try{return JSON.parse(localStorage.getItem("wk_ach")||"[]");}catch(e){return [];}}
 function achCount(){return achGot().length+"/"+Object.keys(ACH).length;}
