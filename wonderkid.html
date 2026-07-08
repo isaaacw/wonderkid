@@ -206,6 +206,12 @@ const CLUB_RATING={
  "Albion City":82,"Merchants FC":80,"Crown Park Rangers":74,"Northgate United":77,"Riverhall FC":73,"Grand Union FC":75,"Regent Athletic":72,"Docklands FC":76,"Cathedral City":71,"Kestrel Heath FC":78
 };
 Object.assign(CLUB_RATING,T4_PRESTIGE);
+// elite clubs play in their own national leagues — they only meet in the European Cup
+function leagueName(tier,club){
+  if(tier===4){const c=T4_INFO[(club||S.club).name]; return c?c+" First Division":"Continental Elite";}
+  return LEAGUES[tier].name;
+}
+function cupTitle(){return S.tier===4?((T4_INFO[S.club.name]||"Elite")+" Cup"):"Albion Cup";}
 // nation tiers: 3⭐ powerhouse, 2⭐ contender, 1⭐ underdog (affects World Cup odds; underdog triumphs count double in legend)
 const NATIONS = {
   England:3, Brazil:3, France:3, Argentina:3, Germany:3, Spain:3,
@@ -492,7 +498,7 @@ function simWeek(){
     const dcSched=[2,3,5,6,7], dcLbl=["R32","R16","QF","SF","the FINAL"];
     if(dcSched[C.dc.r]===blk){
       const p=clamp([0.62,0.55,0.5,0.45,0.42][C.dc.r]+(avg-6.5)*0.08+(S.club.str-LEAGUES[S.tier].avg)*0.045,0.05,0.92);
-      const cupName=S.tier===4?"Elite Cup":"Albion Cup";
+      const cupName=cupTitle();
       if(RNG()<p){C.dc.r++; cupNotes.push(`🏆 ${cupName} ${dcLbl[C.dc.r-1]}: through!${C.dc.r===5?" CUP WINNERS!":""}`);}
       else{C.dc.out=true; cupNotes.push(`🏆 ${cupName}: out at ${dcLbl[C.dc.r]}.`);}
     }
@@ -518,10 +524,10 @@ function seasonEnd(){
   // a player having THAT kind of season drags the team up with him
   if(avg>7.4)res.pos=Math.min(res.pos,12);
   if(avg>7.8)res.pos=Math.min(res.pos,8);
-  if(res.pos===1){ res.trophy=(S.tier===4?"Continental Elite Title":LEAGUES[S.tier].name+" Title"); S.car.trophies.push(res.trophy); S.rep=clamp(S.rep+6,0,100);
-    if(S.tier<4)S.flags.promo=true; // champions go up
+  if(res.pos===1){ res.trophy=leagueName(S.tier)+" Title"; S.car.trophies.push(res.trophy); S.rep=clamp(S.rep+6,0,100);
+    if(S.tier<3)S.flags.promo=true; // champions go up (the elite leagues you reach by transfer only)
   }
-  if(res.pos>=18&&S.tier>0)S.flags.releg=true; // bottom three go down
+  if(res.pos>=18&&S.tier>0&&S.tier<4)S.flags.releg=true; // bottom three go down (elite giants don't drop)
   // awards
   if(avg>7.3&&S.ssn.goals>=15&&S.pos!=="CB"){res.awards.push("League Top Scorer"); S.rep=clamp(S.rep+5,0,100);}
   if(avg>7.5){res.awards.push("Team of the Season"); S.rep=clamp(S.rep+4,0,100);}
@@ -536,7 +542,7 @@ function seasonEnd(){
   if(S.tier>=3&&S.cup){
     const dc=S.cup.dc.r;
     res.cup=["R32","R16","QF","SF","Final — lost","WINNERS 🏆"][dc];
-    if(dc===5){const t=(S.tier===4?"Elite Cup":"Albion Cup"); S.car.trophies.push(t); S.rep=clamp(S.rep+4,0,100);}
+    if(dc===5){S.car.trophies.push(cupTitle()); S.rep=clamp(S.rep+4,0,100);}
   }
   if(S.cup&&S.cup.ec.on){
     const ec=S.cup.ec.r;
@@ -635,7 +641,7 @@ function hud(){
   if(avEl.dataset.k!==avKey){avEl.dataset.k=avKey; avEl.innerHTML=svgAvatar(S.av,46);}
   document.getElementById("hud-body").innerHTML=`
     <div class="row1"><span class="pname">${S.name} <span style="color:var(--muted);font-weight:600;font-size:12px">${POSITIONS[S.pos].label} · ${S.age}y</span></span><span class="ovr">${ovr()}</span></div>
-    <div class="row2"><span>${S.club.name} · ${LEAGUES[S.tier].name}</span><span class="money" title="Your personal savings">💰 Bank: ${fmtM(S.money)}</span></div>
+    <div class="row2"><span>${S.club.name} · ${leagueName(S.tier)}</span><span class="money" title="Your personal savings">💰 Bank: ${fmtM(S.money)}</span></div>
     <div class="bars">${bar("Form",S.form,"var(--green)")}${bar("Fitness",S.fitness,"var(--blue)")}${bar("Morale",S.morale,"#e67e22")}${bar("Fame",S.rep,"var(--gold)")}</div>
     <div class="bars" style="margin-top:6px">${bar("Fans",S.fan??50,"var(--pink)")}${bar("Gaffer",S.mgr??55,"#7a5cc7")}${bar("Squad",S.team??50,"var(--orange)")}</div>
     <div class="attrs">
@@ -793,7 +799,7 @@ function playWeek(){
     <div class="score"><span class="team">${S.club.name}</span><span class="rating-badge" style="background:${rc}">${r.avg.toFixed(1)}</span><span class="team">avg rating</span></div>
     <div class="events">${lines.map((l,i)=>`<div style="animation-delay:${i*0.25}s">${l}</div>`).join("")}</div>
     <div class="events" style="margin-top:9px;border-top:2px dashed var(--dash);padding-top:7px;font-size:12.5px">
-      <div>🏟 ${S.club.name}: <b style="letter-spacing:.15em">${r.rec}</b> · ${ord(r.posNow)} in the ${LEAGUES[S.tier].name}</div>
+      <div>🏟 ${S.club.name}: <b style="letter-spacing:.15em">${r.rec}</b> · ${ord(r.posNow)} in the ${leagueName(S.tier)}</div>
       ${(r.cupNotes||[]).map((c,i)=>`<div style="animation-delay:${0.3+i*0.25}s">${c}</div>`).join("")}
     </div>
     <button class="btn" onclick="go()">Continue →</button>`);
@@ -823,7 +829,7 @@ function renderReview(res){
   let next="";
   if(res.offers.length){
     window._offers=res.offers;
-    next=res.offers.map((o,i)=>`<button class="btn gold" onclick="showScout(${i})">Offer: ${o.club.name}<span class="sub">${LEAGUES[o.tier].name} · ${fmtM(o.wage*LEAGUES[o.tier].wageMult)}/wk · tap for scouting report</span></button>`).join("")+
+    next=res.offers.map((o,i)=>`<button class="btn gold" onclick="showScout(${i})">Offer: ${o.club.name}<span class="sub">${leagueName(o.tier,o.club)} · ${fmtM(o.wage*LEAGUES[o.tier].wageMult)}/wk · tap for scouting report</span></button>`).join("")+
       `<button class="btn alt" onclick="staySeason()">Stay at ${S.club.name}<span class="sub">Loyalty means something</span></button>`;
   } else {
     next=`<button class="btn" onclick="staySeason()">Next season →</button>`;
@@ -840,7 +846,7 @@ function showScout(i){
   const word=o.club.str>=88?["Continental giants","Trophies are expected. Patience is not included."]:diff>=4?["League heavyweights","Feared everywhere they go."]:diff>=0?["Solid and ambitious","A club on the up, hungry to break through."]:["Scrappy underdogs","Punching upward, every single week."];
   card(`<div class="kicker">Scouting report</div><h2>${o.club.name}</h2>
    <div class="srow"><span>Country</span><b>${region}</b></div>
-   <div class="srow"><span>League</span><b>${LEAGUES[o.tier].name}</b></div>
+   <div class="srow"><span>League</span><b>${leagueName(o.tier,o.club)}</b></div>
    <div class="srow"><span>Club rating</span><b>${o.club.str}</b></div>
    <div class="srow"><span>Standing</span><b>${word[0]}</b></div>
    <div class="srow"><span>Wage offer</span><b class="money">${fmtM(o.wage*LEAGUES[o.tier].wageMult)}/wk</b></div>
@@ -908,8 +914,8 @@ function staySeason(){
 function preSeason(){
   const promo=S.flags.justPromo, releg=S.flags.justReleg; S.flags.justPromo=false; S.flags.justReleg=false; save();
   card(`<div class="kicker">Season ${S.season} · Age ${S.age}</div><h2>${promo?"PROMOTED! 🎉":releg?"Relegated. 😔":"Pre-season begins."}</h2>
-   ${promo?`<p><b>${S.club.name} are going up.</b> Welcome to the ${LEAGUES[S.tier].name} — bigger grounds, sharper defenders, better wages. The open-top bus parade lasted four hours.</p>`:""}
-   ${releg?`<p><b>${S.club.name} are going down.</b> Welcome to the ${LEAGUES[S.tier].name} — smaller crowds, angrier phone-ins, and a dressing room that needs dragging back up. Loyalty now would make you a legend. Just saying.</p>`:""}
+   ${promo?`<p><b>${S.club.name} are going up.</b> Welcome to the ${leagueName(S.tier)} — bigger grounds, sharper defenders, better wages. The open-top bus parade lasted four hours.</p>`:""}
+   ${releg?`<p><b>${S.club.name} are going down.</b> Welcome to the ${leagueName(S.tier)} — smaller crowds, angrier phone-ins, and a dressing room that needs dragging back up. Loyalty now would make you a legend. Just saying.</p>`:""}
    <p>${pick(PRESEASON_LINES)}</p>
    <p style="margin-top:8px">Training focus this season:</p>${trainBtns()}`);
 }
