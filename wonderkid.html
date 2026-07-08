@@ -193,11 +193,19 @@ const CLUB_NAMES = [
   ["Albion City","Merchants FC","Crown Park Rangers","Northgate United","Riverhall FC","Grand Union FC","Regent Athletic","Docklands FC","Cathedral City","Kestrel Heath FC"],
   ["Real Costa Dorada","Bayern Adler","AC Fortezza","Paris Lumière","Sporting Atlântico","Ajax Oranje","Real Madrigal","Internazionale Azzurro","Borussia Westfalen","Olympique Azur","Benfica Estrela","Galata Bosphorus"]
 ];
-const T4_INFO={"Real Costa Dorada":"Iberia","Bayern Adler":"Bavaria","AC Fortezza":"Italia","Paris Lumière":"Gallia","Sporting Atlântico":"Lusitania","Ajax Oranje":"the Lowlands","Real Madrigal":"Iberia","Internazionale Azzurro":"Italia","Borussia Westfalen":"Bavaria","Olympique Azur":"Gallia","Benfica Estrela":"Lusitania","Galata Bosphorus":"Anatolia"};
+const T4_INFO={"Real Costa Dorada":"Spain","Bayern Adler":"Germany","AC Fortezza":"Italy","Paris Lumière":"France","Sporting Atlântico":"Portugal","Ajax Oranje":"Netherlands","Real Madrigal":"Spain","Internazionale Azzurro":"Italy","Borussia Westfalen":"Germany","Olympique Azur":"France","Benfica Estrela":"Portugal","Galata Bosphorus":"Turkey"};
 // fixed prestige: giants dominate their domestic scene like real-world superclubs
 const T4_PRESTIGE={"Real Costa Dorada":91,"Bayern Adler":90,"Real Madrigal":90,"Paris Lumière":89,
 "AC Fortezza":87,"Internazionale Azzurro":87,"Ajax Oranje":86,"Benfica Estrela":86,
 "Borussia Westfalen":85,"Sporting Atlântico":84,"Olympique Azur":84,"Galata Bosphorus":83};
+// every club in the world now has a fixed identity
+const CLUB_RATING={
+ "Bramble Rovers":44,"Hartsfield Town":48,"Dockyard Athletic":47,"Millbrook United":50,"Kettlewich FC":43,"Ashcombe Wanderers":45,"Netherfield Albion":49,"Pigeon Park FC":41,"Brinemouth Town":46,"Old Foundry FC":52,
+ "Ironbridge City":60,"Saltmarsh Albion":54,"Redwick Rangers":57,"Fenport County":52,"Oakhurst Town":55,"Colliery FC":58,"Tanners Green FC":51,"Wolfden Athletic":56,"Marsh End United":53,"Cinder Lane FC":62,
+ "Blackmoor City":71,"Kingsreach United":68,"Harborne Athletic":64,"Westcliff FC":62,"Stonegate Rovers":65,"Vale Park FC":63,"Copperfield City":67,"Northmoor Forest":61,"Silverbeck FC":66,"Harridge Town":70,
+ "Albion City":82,"Merchants FC":80,"Crown Park Rangers":74,"Northgate United":77,"Riverhall FC":73,"Grand Union FC":75,"Regent Athletic":72,"Docklands FC":76,"Cathedral City":71,"Kestrel Heath FC":78
+};
+Object.assign(CLUB_RATING,T4_PRESTIGE);
 // nation tiers: 3⭐ powerhouse, 2⭐ contender, 1⭐ underdog (affects World Cup odds; underdog triumphs count double in legend)
 const NATIONS = {
   England:3, Brazil:3, France:3, Argentina:3, Germany:3, Spain:3,
@@ -260,7 +268,7 @@ function newGame(name,country,pos,traits,daily,av){
     fan:50, mgr:55, team:50,
     money:0, wage:180, tier:0, club:null, role:"prospect",
     training:"tec", injury:0, contractYears:2,
-    ssn:{apps:0,goals:0,assists:0,rsum:0,motm:0,x1:0,x2:0},
+    ssn:{apps:0,goals:0,assists:0,rsum:0,motm:0,x1:0,x2:0,tp:0,gp:0,rivalEdge:0},
     car:{apps:0,goals:0,assists:0,caps:0,intGoals:0,earnings:0,trophies:[],awards:[],clubs:[],ballonDor:0,seasons:[]},
     flags:{}, pendingEvent:null, phase:"week",
     rngState: daily ? ((dailySeed()^0x1F123BB5)|0) : null,
@@ -276,6 +284,8 @@ function newGame(name,country,pos,traits,daily,av){
   S.attrs={tec: ri(40,48), pac: ri(40,48), phy: ri(33,41), men: ri(33,41)};
   S.pot=potRoll();
   S.capJit={tec:ri(-2,1),pac:ri(-2,1),phy:ri(-3,0),men:ri(-2,1)}; // stats plateau at varied heights, not one flat number
+  S.ssn.rivalEdge=rnd(-2.5,2.5); // how strong the competition is this year
+  S.cup={dc:{r:0,out:false},ec:{on:false,r:0,out:false}};
   S.club=makeClub(0); S.car.clubs=[S.club.name];
   if(S.traits.includes("rocket")) S.attrs.pac+=6;
   if(S.traits.includes("finisher")) S.attrs.tec+=4;
@@ -288,7 +298,7 @@ function newGame(name,country,pos,traits,daily,av){
 function makeClub(tier){
   const league=LEAGUES[tier];
   const name=pick(CLUB_NAMES[tier]);
-  const str=(tier===4&&T4_PRESTIGE[name])?T4_PRESTIGE[name]+ri(-1,1):clamp(league.avg+ri(-6,6),40,95);
+  const str=CLUB_RATING[name]!==undefined?CLUB_RATING[name]+ri(-1,1):clamp(league.avg+ri(-6,6),40,95);
   return {name, tier, str};
 }
 function ovr(){
@@ -462,16 +472,49 @@ function simWeek(){
     S.car.caps++; const ig=(S.pos!=="CB"&&RNG()<0.35)?1:0; S.car.intGoals+=ig;
     intl={caps:1,goals:ig};
   }
-  return {apps,goals,assists,avg,motm,x1,x2,injuredNow:S.injury>0&&true,intl,derby};
+  // ---- the team's month: 4 league matches, your level pulling them up or down ----
+  S.cup=S.cup||{dc:{r:0,out:false},ec:{on:S.tier===4,r:0,out:false}};
+  const edge=(S.club.str-LEAGUES[S.tier].avg)-(S.ssn.rivalEdge||0);
+  let rec="",pts=0;
+  for(let m=0;m<4;m++){
+    const wp=clamp(0.5+edge*0.032+(avg-6.3)*0.05,0.07,0.88);
+    const roll=RNG();
+    if(roll<wp){pts+=3;rec+="W ";}
+    else if(roll<wp+0.22){pts+=1;rec+="D ";}
+    else rec+="L ";
+  }
+  S.ssn.tp=(S.ssn.tp||0)+pts; S.ssn.gp=(S.ssn.gp||0)+4;
+  const ppg=S.ssn.tp/S.ssn.gp;
+  const posNow=clamp(Math.round(10.5-(ppg-1.35)*11),1,20);
+  // ---- cup rounds on the calendar ----
+  const cupNotes=[]; const blk=S.week+1; const C=S.cup;
+  if(S.tier>=3&&!C.dc.out&&C.dc.r<5){
+    const dcSched=[2,3,5,6,7], dcLbl=["R32","R16","QF","SF","the FINAL"];
+    if(dcSched[C.dc.r]===blk){
+      const p=clamp([0.62,0.55,0.5,0.45,0.42][C.dc.r]+(avg-6.5)*0.08+(S.club.str-LEAGUES[S.tier].avg)*0.045,0.05,0.92);
+      const cupName=S.tier===4?"Elite Cup":"Albion Cup";
+      if(RNG()<p){C.dc.r++; cupNotes.push(`🏆 ${cupName} ${dcLbl[C.dc.r-1]}: through!${C.dc.r===5?" CUP WINNERS!":""}`);}
+      else{C.dc.out=true; cupNotes.push(`🏆 ${cupName}: out at ${dcLbl[C.dc.r]}.`);}
+    }
+  }
+  if(C.ec.on&&!C.ec.out&&C.ec.r<5){
+    const ecSched=[4,5,6,7,8], ecLbl=["the group stage","R16","QF","SF","the FINAL"];
+    if(ecSched[C.ec.r]===blk){
+      const p=clamp([0.56,0.38,0.34,0.30,0.26][C.ec.r]+(avg-6.5)*0.08+(S.club.str-LEAGUES[S.tier].avg)*0.01,0.05,0.92);
+      if(RNG()<p){C.ec.r++; cupNotes.push(`⭐ European Cup ${ecLbl[C.ec.r-1]}: through!${C.ec.r===5?" CHAMPIONS OF EUROPE!!":""}`);}
+      else{C.ec.out=true; cupNotes.push(`⭐ European Cup: out at ${ecLbl[C.ec.r]}.`);}
+    }
+  }
+  return {apps,goals,assists,avg,motm,x1,x2,injuredNow:S.injury>0&&true,intl,derby,rec:rec.trim(),pts,posNow,cupNotes};
 }
 
 function seasonEnd(){
   const avg=S.ssn.apps?S.ssn.rsum/S.ssn.apps:0;
   const res={avg, ...S.ssn, awards:[], trophy:null, offers:[]};
   // league outcome
-  const clubEdge=S.club.str-LEAGUES[S.tier].avg; // giants dominate their league
-  const teamScore=(avg-6.3)*3.5 + clubEdge*0.7 + rnd(-4,4);
-  res.pos=clamp(Math.round(10.5-teamScore*1.8+rnd(-2,2)),1,20);
+  // final table comes straight from the points the team actually banked, block by block
+  const gp=S.ssn.gp||0, ppg=gp?(S.ssn.tp||0)/gp:1.35;
+  res.pos=clamp(Math.round(10.5-(ppg-1.35)*11+rnd(-1.2,1.2)),1,20);
   // a player having THAT kind of season drags the team up with him
   if(avg>7.4)res.pos=Math.min(res.pos,12);
   if(avg>7.8)res.pos=Math.min(res.pos,8);
@@ -489,16 +532,14 @@ function seasonEnd(){
   if(res.pos<=4)S.fan=clamp((S.fan??50)+3,0,100);
   if(avg>6.8)S.mgr=clamp((S.mgr??55)+5,0,100);
   // domestic cup (top two levels)
-  if(S.tier>=3){
-    const perf=(avg-6.5)*0.08+(S.club.str-LEAGUES[S.tier].avg)*0.045; // strong clubs hoover up domestic cups
-    const dc=cupRun([0.62,0.55,0.5,0.45,0.42],perf);
+  // cups were played round-by-round during the season — just read the outcome
+  if(S.tier>=3&&S.cup){
+    const dc=S.cup.dc.r;
     res.cup=["R32","R16","QF","SF","Final — lost","WINNERS 🏆"][dc];
     if(dc===5){const t=(S.tier===4?"Elite Cup":"Albion Cup"); S.car.trophies.push(t); S.rep=clamp(S.rep+4,0,100);}
   }
-  // European Cup: the hardest prize in club football
-  if(S.tier===4||(S.tier===3&&S.flags.euroSpot)){
-    const perf=(avg-6.5)*0.08+(S.club.str-LEAGUES[S.tier].avg)*0.01; // Europe humbles everyone
-    const ec=cupRun([0.58,0.40,0.36,0.32,0.28],perf);
+  if(S.cup&&S.cup.ec.on){
+    const ec=S.cup.ec.r;
     res.euro=["Group stage","R16","QF","SF","Final — lost","CHAMPIONS 🏆🏆"][ec];
     if(ec===5){S.car.trophies.push("🏆 EUROPEAN CUP"); S.car.awards.push("European Champion"); S.rep=clamp(S.rep+10,0,100);}
     else if(ec>=3)S.rep=clamp(S.rep+3,0,100);
@@ -556,7 +597,8 @@ function ageUp(){
   ["nightout","gaffer","derby","injury_choice","newdeal"].forEach(id=>delete S.flags["done_"+id]);
   if(S.season%2===0){["newmanager","interview","interview2"].forEach(id=>delete S.flags["done_"+id]);} // slower-burn events
   S.flags.tabloid=false;
-  S.ssn={apps:0,goals:0,assists:0,rsum:0,motm:0,x1:0,x2:0};
+  S.ssn={apps:0,goals:0,assists:0,rsum:0,motm:0,x1:0,x2:0,tp:0,gp:0,rivalEdge:rnd(-2.5,2.5)+(S.tier===4?3:0)}; // at the top, the other giants bite back
+  S.cup={dc:{r:0,out:false},ec:{on:(S.tier===4||(S.tier===3&&!!S.flags.euroSpot)),r:0,out:false}};
   S.fitness=100; S.form=clamp(S.form*0.5+25,20,80);
   if(S.contractYears<=0){S.contractYears=2; S.wage*=1.15;}
   save();
@@ -750,6 +792,10 @@ function playWeek(){
     <div class="kicker">Match block ${S.week}/${WEEKS} · ${r.apps} games</div>
     <div class="score"><span class="team">${S.club.name}</span><span class="rating-badge" style="background:${rc}">${r.avg.toFixed(1)}</span><span class="team">avg rating</span></div>
     <div class="events">${lines.map((l,i)=>`<div style="animation-delay:${i*0.25}s">${l}</div>`).join("")}</div>
+    <div class="events" style="margin-top:9px;border-top:2px dashed var(--dash);padding-top:7px;font-size:12.5px">
+      <div>🏟 ${S.club.name}: <b style="letter-spacing:.15em">${r.rec}</b> · ${ord(r.posNow)} in the ${LEAGUES[S.tier].name}</div>
+      ${(r.cupNotes||[]).map((c,i)=>`<div style="animation-delay:${0.3+i*0.25}s">${c}</div>`).join("")}
+    </div>
     <button class="btn" onclick="go()">Continue →</button>`);
 }
 
@@ -757,6 +803,10 @@ function playWeek(){
 function showSeasonEnd(){
   const res=seasonEnd(); save();
   adBreak(()=>{});
+  window._lastRes=res;
+  renderReview(res);
+}
+function renderReview(res){
   const rows=`
     <div class="srow"><span>Appearances</span><b>${res.apps}</b></div>
     <div class="srow"><span>Goals</span><b>${res.goals}</b></div>
@@ -773,7 +823,7 @@ function showSeasonEnd(){
   let next="";
   if(res.offers.length){
     window._offers=res.offers;
-    next=res.offers.map((o,i)=>`<button class="btn gold" onclick="acceptOffer(${i})">Join ${o.club.name}<span class="sub">${LEAGUES[o.tier].name} · ${fmtM(o.wage*LEAGUES[o.tier].wageMult)}/wk${o.tier===4?` · ${T4_INFO[o.club.name]||"Europe"} · ${o.club.str>=87?"continental giants":o.club.str>=84?"title contenders":"European regulars"}`:""}</span></button>`).join("")+
+    next=res.offers.map((o,i)=>`<button class="btn gold" onclick="showScout(${i})">Offer: ${o.club.name}<span class="sub">${LEAGUES[o.tier].name} · ${fmtM(o.wage*LEAGUES[o.tier].wageMult)}/wk · tap for scouting report</span></button>`).join("")+
       `<button class="btn alt" onclick="staySeason()">Stay at ${S.club.name}<span class="sub">Loyalty means something</span></button>`;
   } else {
     next=`<button class="btn" onclick="staySeason()">Next season →</button>`;
@@ -782,6 +832,22 @@ function showSeasonEnd(){
   window._ssnShare=`Wonderkid S${S.season} (age ${S.age}): ${res.goals}⚽ ${res.assists}🅰 · ${res.avg.toFixed(2)} avg · ${ord(res.pos)} with ${S.club.name}${res.trophy?" 🏆":""}${res.awards.length?" 🎖":""} — wonderkidgame.com`;
   card(`<div class="kicker">Season ${S.season} complete · Age ${S.age}</div><h2>Season Review</h2>${rows}
     <button class="btn alt" onclick="shareTxt(window._ssnShare)">📋 Share season</button>${next}`);
+}
+function showScout(i){
+  const o=window._offers[i]; const fee=transferFee();
+  const region=o.tier===4?(T4_INFO[o.club.name]||"Europe"):"Albion";
+  const diff=o.club.str-LEAGUES[o.tier].avg;
+  const word=o.club.str>=88?["Continental giants","Trophies are expected. Patience is not included."]:diff>=4?["League heavyweights","Feared everywhere they go."]:diff>=0?["Solid and ambitious","A club on the up, hungry to break through."]:["Scrappy underdogs","Punching upward, every single week."];
+  card(`<div class="kicker">Scouting report</div><h2>${o.club.name}</h2>
+   <div class="srow"><span>Country</span><b>${region}</b></div>
+   <div class="srow"><span>League</span><b>${LEAGUES[o.tier].name}</b></div>
+   <div class="srow"><span>Club rating</span><b>${o.club.str}</b></div>
+   <div class="srow"><span>Standing</span><b>${word[0]}</b></div>
+   <div class="srow"><span>Wage offer</span><b class="money">${fmtM(o.wage*LEAGUES[o.tier].wageMult)}/wk</b></div>
+   <div class="srow"><span>Likely fee</span><b>${fmtM(fee)}</b></div>
+   <p style="margin-top:9px">${word[1]} ${diff>=4?"You'd be joining stars — minutes must be earned.":"They'd build around you. First-name-on-the-teamsheet material."}</p>
+   <button class="btn gold" onclick="acceptOffer(${i})">✍ Sign for ${o.club.name}</button>
+   <button class="btn alt" onclick="renderReview(window._lastRes)">← Back to the season review</button>`);
 }
 function transferFee(){
   const o=ovr();
