@@ -212,6 +212,13 @@ function leagueName(tier,club){
   return LEAGUES[tier].name;
 }
 function cupTitle(){return S.tier===4?((T4_INFO[S.club.name]||"Elite")+" Cup"):"Albion Cup";}
+// era rivals: the stars you share a career with — they win the years you don't
+function mkRivals(){
+  const mk=n=>({n,club:pick(CLUB_NAMES[4]),q:ri(89,95),age:ri(21,26),wins:0});
+  const r=[mk("Danilo Reyes")]; const used=new Set(["Danilo Reyes"]);
+  while(r.length<3){const n=pick(FIRST)+" "+pick(LAST); if(!used.has(n)){used.add(n); r.push(mk(n));}}
+  return r;
+}
 // nation tiers: 3⭐ powerhouse, 2⭐ contender, 1⭐ underdog (affects World Cup odds; underdog triumphs count double in legend)
 const NATIONS = {
   England:3, Brazil:3, France:3, Argentina:3, Germany:3, Spain:3,
@@ -292,6 +299,7 @@ function newGame(name,country,pos,traits,daily,av){
   S.capJit={tec:ri(-2,1),pac:ri(-2,1),phy:ri(-3,0),men:ri(-2,1)}; // stats plateau at varied heights, not one flat number
   S.ssn.rivalEdge=rnd(-2.5,2.5); // how strong the competition is this year
   S.cup={dc:{r:0,out:false},ec:{on:false,r:0,out:false}};
+  S.rivals=mkRivals();
   S.club=makeClub(0); S.car.clubs=[S.club.name];
   if(S.traits.includes("rocket")) S.attrs.pac+=6;
   if(S.traits.includes("finisher")) S.attrs.tec+=4;
@@ -562,6 +570,18 @@ function seasonEnd(){
     if(rank===1){res.awards.push("🏆 BALLON D'OR"); S.car.ballonDor++; S.rep=100; ach("bdo"); if(S.car.ballonDor>=3)ach("bdo3");}
     else if(rank===2&&tr>=2)res.awards.push("Ballon d'Or: 2nd in the vote. Robbed.");
     res.bdoRank=rank;
+    // the ceremony: who else made the podium
+    S.rivals=S.rivals||mkRivals();
+    const rs=S.rivals.map(r=>({r,sc:r.q+r.wins*0.5+rnd(-3,3)})).sort((a,b)=>b.sc-a.sc).map(x=>x.r);
+    const others=["Yaya Kanouté","Björn Askildsen","Mateo Ferraz","Kenji Watanabe","Luca Marchetti","Sander Vliet"];
+    const pool=rs.map(r=>({n:r.n,club:r.club,rv:r})).concat(others.map(n=>({n,club:pick(CLUB_NAMES[4])})));
+    let pi=0; const top=[];
+    for(let rk=1;rk<=5;rk++){
+      if(rk===rank)top.push({rank:rk,n:S.name,club:S.club.name,you:true});
+      else top.push(Object.assign({rank:rk},pool[pi++]));
+    }
+    res.bdoBoard=top;
+    if(!top[0].you){ if(top[0].rv)top[0].rv.wins++; res.bdoWinner=top[0].n; res.bdoWinnerWins=top[0].rv?top[0].rv.wins:1; }
   }
   S.flags.wcYear=false;
   S.lastPos=res.pos;
@@ -605,6 +625,11 @@ function ageUp(){
   S.flags.tabloid=false;
   S.ssn={apps:0,goals:0,assists:0,rsum:0,motm:0,x1:0,x2:0,tp:0,gp:0,rivalEdge:rnd(-2.5,2.5)+(S.tier===4?3:0)}; // at the top, the other giants bite back
   S.cup={dc:{r:0,out:false},ec:{on:(S.tier===4||(S.tier===3&&!!S.flags.euroSpot)),r:0,out:false}};
+  // rivals age with you: peak, fade, retire, get replaced by the next wonderkid
+  (S.rivals=S.rivals||mkRivals()).forEach((r,i)=>{
+    r.age++; r.q=clamp(r.q+rnd(-0.8,0.8)+(r.age<27?0.4:r.age>31?-1:0),84,98);
+    if(r.age>35)S.rivals[i]={n:pick(FIRST)+" "+pick(LAST),club:pick(CLUB_NAMES[4]),q:ri(88,94),age:ri(20,23),wins:0};
+  });
   S.fitness=100; S.form=clamp(S.form*0.5+25,20,80);
   if(S.contractYears<=0){S.contractYears=2; S.wage*=1.15;}
   save();
@@ -837,6 +862,7 @@ function renderReview(res){
   if(S.age>=33) next+=`<button class="btn alt" onclick="retire()" style="border-color:var(--red)">🏁 Retire<span class="sub">Hang up the boots</span></button>`;
   window._ssnShare=`Wonderkid S${S.season} (age ${S.age}): ${res.goals}⚽ ${res.assists}🅰 · ${res.avg.toFixed(2)} avg · ${ord(res.pos)} with ${S.club.name}${res.trophy?" 🏆":""}${res.awards.length?" 🎖":""} — wonderkidgame.com`;
   card(`<div class="kicker">Season ${S.season} complete · Age ${S.age}</div><h2>Season Review</h2>${rows}
+    ${res.bdoBoard?`<button class="btn" style="background:var(--gold);color:#171310" onclick="showCeremony(window._lastRes)">🏆 Ballon d'Or ceremony<span class="sub" style="color:#5a4a1a">World ranking: #${res.bdoRank} — see who took it</span></button>`:""}
     <button class="btn alt" onclick="shareTxt(window._ssnShare)">📋 Share season</button>${next}`);
 }
 function showScout(i){
@@ -1391,6 +1417,27 @@ function cabinet(c){
   return items.slice(0,3).map(x=>`${x[1]} ×${x[0]}`).join(" · ");
 }
 
+/* ---------------- BALLON D'OR CEREMONY ---------------- */
+function showCeremony(res){
+  const medals=["🥇","🥈","🥉"];
+  const rows=res.bdoBoard.map(e=>`<div class="srow" style="${e.you?"background:rgba(245,194,17,.25);border-radius:8px;padding-left:6px;padding-right:6px":""}">
+    <span>${e.rank<=3?medals[e.rank-1]:"#"+e.rank} <b>${e.n}</b>${e.you?" — YOU":""}${(!e.you&&e.rv&&e.rv.wins>1&&e.rank===1)?` <span style="color:var(--muted);font-size:12px">(his ${ord(e.rv.wins)})</span>`:""}</span>
+    <b style="font-weight:600;color:var(--muted);font-size:13px">${e.club}</b></div>`).join("");
+  const you=res.bdoBoard.find(e=>e.you);
+  const extra=you?"":`<div class="srow"><span style="color:var(--muted)">…</span><b></b></div>
+    <div class="srow" style="background:rgba(245,194,17,.25);border-radius:8px;padding-left:6px;padding-right:6px"><span>#${res.bdoRank} <b>${S.name}</b> — YOU</span><b style="font-weight:600;color:var(--muted);font-size:13px">${S.club.name}</b></div>`;
+  const flavor=res.bdoRank===1?"They call your name. The room stands. Somewhere, your first coach is telling everyone he always knew.":
+    res.bdoRank===2?"So close you can smell the polish on the trophy. Next year, it has your name on it.":
+    res.bdoRank<=5?"On the podium's doorstep, in a hired tux, clapping politely. It burns. Good — let it.":
+    res.bdoRank<=15?"In the room, near the back, near the canapés. The commentators mention you once.":
+    "You watch from the sofa, rating everyone's speeches out of ten. Yours would've been better.";
+  card(`<div class="kicker">🏆 Ballon d'Or · Season ${S.season}</div>
+    <h2>${res.bdoRank===1?"THE WORLD IS YOURS.":(res.bdoWinner||"The favourite")+" takes it."}</h2>
+    ${rows}${extra}
+    <p style="margin-top:9px">${flavor}</p>
+    <button class="btn" onclick="renderReview(window._lastRes)">← Back to the review</button>`);
+}
+
 /* ---------------- MANAGER MODE TEASER (measuring demand via GA) ---------------- */
 function managerTeaser(pname){
   try{if(typeof gtag==="function")gtag('event','manager_teaser_click');}catch(e){}
@@ -1400,6 +1447,18 @@ function managerTeaser(pname){
     <p style="margin-top:8px">Your click counts as a vote for it — the more retired legends knock on this door, the faster it gets built. 📊</p>
     <button class="btn gold" onclick="screenStart()">↺ Back to the pitch — new career</button>`);
 }
+
+/* ---------------- DEV CONSOLE (playtesting only — open DevTools, type wk.god()) ---------------- */
+window.wk={
+  god(){ if(!S)return "start a career first";
+    S.age=26; S.pot=99; S.attrs={tec:95,pac:93,phy:90,men:94}; S.capJit={tec:1,pac:1,phy:1,men:1};
+    S.rep=95; S.form=85; S.morale=90; S.role="star"; S.tier=4; S.club=makeClub(4); S.flags.capped=true;
+    save(); hud(); return "superstar at "+S.club.name+" — play on"; },
+  ovr(n){ if(!S)return "start a career first"; S.pot=Math.max(S.pot,n+2); S.attrs={tec:n,pac:n-2,phy:n-4,men:n-1}; save(); hud(); return "done"; },
+  age(n){ if(!S)return "start a career first"; S.age=n; save(); hud(); return "age "+n; },
+  rep(n){ if(!S)return "start a career first"; S.rep=clamp(n,0,100); save(); hud(); return "rep "+n; },
+  money(n){ if(!S)return "start a career first"; S.money=n; save(); hud(); return fmtM(n); }
+};
 
 /* ---------------- BOOT ---------------- */
 initTheme();
